@@ -7,7 +7,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-  <script src="https://unpkg.com/lucide-react@0.383.0/dist/umd/lucide-react.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; background: #f9fafb; }
@@ -21,11 +20,30 @@
 
   <script type="text/babel">
     const { useState, useMemo } = React;
-    const {
-      Plus, Search, X, Edit2, LayoutGrid, List,
-      DollarSign, TrendingUp, Target, CheckCircle,
-      ChevronLeft, ChevronRight
-    } = LucideReact;
+
+    // ─── Inline SVG Icons ────────────────────────────────────
+    function Ico({ d, size = 18, strokeWidth = 2, ...rest }) {
+      const paths = Array.isArray(d) ? d : [d];
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" strokeWidth={strokeWidth}
+          strokeLinecap="round" strokeLinejoin="round" {...rest}>
+          {paths.map((p, i) => <path key={i} d={p} />)}
+        </svg>
+      );
+    }
+    const Plus        = (p) => <Ico d={["M12 5v14","M5 12h14"]} {...p} />;
+    const Search      = (p) => <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" {...p} />;
+    const X           = (p) => <Ico d={["M18 6L6 18","M6 6l12 12"]} {...p} />;
+    const Edit2       = (p) => <Ico d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" {...p} />;
+    const LayoutGrid  = (p) => <Ico d={["M3 3h7v7H3z","M14 3h7v7h-7z","M14 14h7v7h-7z","M3 14h7v7H3z"]} {...p} />;
+    const List        = (p) => <Ico d={["M8 6h13","M8 12h13","M8 18h13","M3 6h.01","M3 12h.01","M3 18h.01"]} {...p} />;
+    const DollarSign  = (p) => <Ico d={["M12 1v22","M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"]} {...p} />;
+    const TrendingUp  = (p) => <Ico d={["M23 6l-9.5 9.5-5-5L1 18","M17 6h6v6"]} {...p} />;
+    const Target      = (p) => <Ico d={["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z","M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12z","M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"]} {...p} />;
+    const CheckCircle = (p) => <Ico d={["M22 11.08V12a10 10 0 1 1-5.93-9.14","M22 4L12 14.01l-3-3"]} {...p} />;
+    const ChevronLeft = (p) => <Ico d="M15 18l-6-6 6-6" {...p} />;
+    const ChevronRight= (p) => <Ico d="M9 18l6-6-6-6" {...p} />;
 
     // ─── Config ────────────────────────────────────────────────────────────
 
