@@ -1,0 +1,855 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Opportunity Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide-react@0.383.0/dist/umd/lucide-react.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f9fafb; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+    const {
+      Plus, Search, X, Edit2, LayoutGrid, List,
+      DollarSign, TrendingUp, Target, CheckCircle,
+      ChevronLeft, ChevronRight
+    } = LucideReact;
+
+    // ─── Config ────────────────────────────────────────────────────────────
+
+    const STAGES = [
+      "New Lead", "Discovery", "Scoping",
+      "Proposal Sent", "Negotiation", "Won", "Lost", "On-hold"
+    ];
+
+    const STAGE_META = {
+      "New Lead":      { bg: "bg-blue-50",   text: "text-blue-700",   dot: "bg-blue-400",   pill: "bg-blue-100 text-blue-700" },
+      "Discovery":     { bg: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-400", pill: "bg-violet-100 text-violet-700" },
+      "Scoping":       { bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-400", pill: "bg-orange-100 text-orange-700" },
+      "Proposal Sent": { bg: "bg-amber-50",  text: "text-amber-700",  dot: "bg-amber-400",  pill: "bg-amber-100 text-amber-700" },
+      "Negotiation":   { bg: "bg-pink-50",   text: "text-pink-700",   dot: "bg-pink-400",   pill: "bg-pink-100 text-pink-700" },
+      "Won":           { bg: "bg-green-50",  text: "text-green-700",  dot: "bg-green-400",  pill: "bg-green-100 text-green-700" },
+      "Lost":          { bg: "bg-red-50",    text: "text-red-700",    dot: "bg-red-400",    pill: "bg-red-100 text-red-700" },
+      "On-hold":       { bg: "bg-gray-50",   text: "text-gray-500",   dot: "bg-gray-300",   pill: "bg-gray-100 text-gray-500" },
+    };
+
+    const ENGAGEMENT_TYPES = ["Dedicated Resource", "Recurring Engagement", "Project-to-Project"];
+
+    const EXPERTISE = [
+      "Consulting / Strategy",
+      "Campaign Execution",
+      "Marketing Automation Setup",
+      "Design",
+      "Copywriting",
+      "Template Production",
+      "Data / CDP Integration",
+      "CRM Migration / Implementation",
+    ];
+
+    const PRIMARY_PLATFORMS = [
+      "Salesforce Marketing Cloud", "Braze", "Marketo",
+      "HubSpot", "Klaviyo", "Iterable", "Bloomreach", "Customer.io", "Other"
+    ];
+
+    const ADDITIONAL_TOOLS_LIST = [
+      "Segment", "Snowflake", "GA4", "Amplitude",
+      "Shopify", "BigQuery", "CDP", "Figma", "Litmus"
+    ];
+
+    const BILLING_MODELS = ["Dedicated", "Shared", "Project Based"];
+    const TIMEZONES = ["AU", "EU", "US", "Other"];
+    const COPYWRITING_OPTS = ["AI Driven (Very Fast)", "AI + Human Driven (Fast)", "Highly Creative (Standard)"];
+    const EMAIL_PROD_OPTS = [
+      "AI Generated Templates",
+      "Drag & Drop Builder (MAP based)",
+      "Custom HTML Development"
+    ];
+    const SOURCES = ["Inbound", "Outbound", "Referral", "Event", "Partner", "LinkedIn", "Website"];
+
+    const EMPTY = {
+      company: "", industry: "", pocName: "", pocEmail: "", pocPhone: "",
+      opportunityOwner: "", opportunityCreationDate: "",
+      engagementType: "", expertiseNeeded: [],
+      problemStatement: "",
+      primaryPlatform: "", additionalTools: [],
+      scopeOfWork: "", campaignsPerMonth: "", templatesPerMonth: "", automationsRequired: "",
+      copywritingRequirement: "", emailProductionRequirement: "",
+      estimatedHours: "", potentialMonthlyRevenue: "", billingModel: "",
+      clientTimezone: "", supportWindow: "",
+      stage: "New Lead", source: "", assignedToSales: "",
+      salesNotes: "", debriefNotes: "",
+    };
+
+    const SEED = [
+      {
+        id: 1, company: "Zara Ventures", industry: "Retail / E-commerce",
+        pocName: "Priya Mehta", pocEmail: "priya@zaraventures.com", pocPhone: "+91 98765 43210",
+        opportunityOwner: "Ravi (CSM)", opportunityCreationDate: "2026-03-01",
+        engagementType: "Recurring Engagement",
+        expertiseNeeded: ["Campaign Execution", "Marketing Automation Setup", "Design"],
+        problemStatement: "Client needs full lifecycle automation setup on Braze. Currently doing manual campaigns with no triggered flows.",
+        primaryPlatform: "Braze", additionalTools: ["Segment", "Figma", "Amplitude"],
+        scopeOfWork: "Build 5 lifecycle journeys, 3 triggered campaigns, monthly reporting dashboard.",
+        campaignsPerMonth: "8", templatesPerMonth: "12", automationsRequired: "5",
+        copywritingRequirement: "AI + Human Driven (Fast)",
+        emailProductionRequirement: "Custom HTML Development",
+        estimatedHours: "80", potentialMonthlyRevenue: "120000", billingModel: "Dedicated",
+        clientTimezone: "AU", supportWindow: "9 AM – 5 PM AEST",
+        stage: "Negotiation", source: "Referral", assignedToSales: "Anita (Sales)",
+        salesNotes: "Client wants to close before end of Q1. Budget confirmed.", debriefNotes: "",
+        lastUpdated: "2026-03-20",
+      },
+      {
+        id: 2, company: "NeoBank India", industry: "BFSI / Fintech",
+        pocName: "Sameer Joshi", pocEmail: "sameer@neobank.in", pocPhone: "+91 87654 32109",
+        opportunityOwner: "Meera (AM)", opportunityCreationDate: "2026-03-05",
+        engagementType: "Project-to-Project",
+        expertiseNeeded: ["CRM Migration / Implementation", "Consulting / Strategy"],
+        problemStatement: "Migrating from HubSpot to Salesforce Marketing Cloud. Need implementation support and campaign setup.",
+        primaryPlatform: "Salesforce Marketing Cloud", additionalTools: ["Snowflake", "Segment"],
+        scopeOfWork: "Full SFMC migration, data model setup, 3 initial campaign builds.",
+        campaignsPerMonth: "3", templatesPerMonth: "6", automationsRequired: "2",
+        copywritingRequirement: "AI Driven (Very Fast)",
+        emailProductionRequirement: "Drag & Drop Builder (MAP based)",
+        estimatedHours: "60", potentialMonthlyRevenue: "90000", billingModel: "Project Based",
+        clientTimezone: "US", supportWindow: "10 AM – 6 PM EST",
+        stage: "Proposal Sent", source: "Inbound", assignedToSales: "Raj (Sales)",
+        salesNotes: "Proposal sent March 18. Awaiting feedback.", debriefNotes: "",
+        lastUpdated: "2026-03-18",
+      },
+      {
+        id: 3, company: "GreenPulse Foods", industry: "FMCG / D2C",
+        pocName: "Aisha Khan", pocEmail: "aisha@greenpulse.co", pocPhone: "+91 99887 76655",
+        opportunityOwner: "Ravi (CSM)", opportunityCreationDate: "2026-03-15",
+        engagementType: "Recurring Engagement",
+        expertiseNeeded: ["Campaign Execution", "Copywriting", "Template Production"],
+        problemStatement: "Brand lacks consistent email & SMS engagement. Looking for ongoing execution on Klaviyo.",
+        primaryPlatform: "Klaviyo", additionalTools: ["Shopify", "GA4"],
+        scopeOfWork: "Monthly email + SMS campaigns, A/B testing, creative production.",
+        campaignsPerMonth: "6", templatesPerMonth: "8", automationsRequired: "3",
+        copywritingRequirement: "Highly Creative (Standard)",
+        emailProductionRequirement: "Drag & Drop Builder (MAP based)",
+        estimatedHours: "40", potentialMonthlyRevenue: "55000", billingModel: "Shared",
+        clientTimezone: "AU", supportWindow: "9 AM – 5 PM AEST",
+        stage: "Discovery", source: "LinkedIn", assignedToSales: "",
+        salesNotes: "Discovery call scheduled for March 28.", debriefNotes: "",
+        lastUpdated: "2026-03-15",
+      },
+      {
+        id: 4, company: "TechNova Labs", industry: "SaaS / Technology",
+        pocName: "Vikram Sharma", pocEmail: "vikram@technovalabs.io", pocPhone: "+91 77665 54433",
+        opportunityOwner: "Meera (AM)", opportunityCreationDate: "2026-03-08",
+        engagementType: "Dedicated Resource",
+        expertiseNeeded: ["Marketing Automation Setup", "Data / CDP Integration", "Consulting / Strategy"],
+        problemStatement: "Scaling PLG motion — need dedicated resource to own lifecycle journeys in Iterable with Snowflake integration.",
+        primaryPlatform: "Iterable", additionalTools: ["Snowflake", "BigQuery", "Amplitude", "Segment"],
+        scopeOfWork: "Full lifecycle strategy, Iterable build-out, Snowflake integration, weekly reporting.",
+        campaignsPerMonth: "12", templatesPerMonth: "15", automationsRequired: "8",
+        copywritingRequirement: "AI + Human Driven (Fast)",
+        emailProductionRequirement: "Custom HTML Development",
+        estimatedHours: "120", potentialMonthlyRevenue: "180000", billingModel: "Dedicated",
+        clientTimezone: "EU", supportWindow: "9 AM – 6 PM CET",
+        stage: "Scoping", source: "Event", assignedToSales: "Anita (Sales)",
+        salesNotes: "Complex project — scope carefully before pricing.", debriefNotes: "",
+        lastUpdated: "2026-03-22",
+      },
+      {
+        id: 5, company: "Orbit Retail", industry: "Retail / E-commerce",
+        pocName: "Neha Patel", pocEmail: "neha@orbitretail.com", pocPhone: "+91 90001 23456",
+        opportunityOwner: "Ravi (CSM)", opportunityCreationDate: "2026-02-15",
+        engagementType: "Recurring Engagement",
+        expertiseNeeded: ["Campaign Execution", "Template Production", "Copywriting"],
+        problemStatement: "Needs ongoing campaign execution and template production support on HubSpot.",
+        primaryPlatform: "HubSpot", additionalTools: ["Shopify", "GA4", "Figma"],
+        scopeOfWork: "Monthly email campaigns, landing pages, A/B tests and performance reports.",
+        campaignsPerMonth: "5", templatesPerMonth: "7", automationsRequired: "2",
+        copywritingRequirement: "AI Driven (Very Fast)",
+        emailProductionRequirement: "Drag & Drop Builder (MAP based)",
+        estimatedHours: "35", potentialMonthlyRevenue: "48000", billingModel: "Shared",
+        clientTimezone: "US", supportWindow: "9 AM – 5 PM PST",
+        stage: "Won", source: "Outbound", assignedToSales: "Raj (Sales)",
+        salesNotes: "Contract signed. Kickoff April 1.",
+        debriefNotes: "Ops: assign account manager, prep onboarding checklist, share Notion workspace.",
+        lastUpdated: "2026-03-10",
+      },
+    ];
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    const fmt = (v) => v ? "₹" + Number(v).toLocaleString("en-IN") : "—";
+    const today = () => new Date().toISOString().slice(0, 10);
+
+    // ─── Small UI pieces ──────────────────────────────────────────────────────
+
+    function StagePill({ stage }) {
+      const m = STAGE_META[stage] || STAGE_META["On-hold"];
+      return <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${m.pill}`}>{stage}</span>;
+    }
+
+    function Tag({ children, color = "bg-indigo-50 text-indigo-700" }) {
+      return <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${color}`}>{children}</span>;
+    }
+
+    function MultiSelect({ options, selected, onChange }) {
+      return (
+        <div className="flex flex-wrap gap-2">
+          {options.map((o) => {
+            const active = selected.includes(o);
+            return (
+              <button key={o} type="button"
+                onClick={() => onChange(active ? selected.filter((x) => x !== o) : [...selected, o])}
+                className={`text-xs px-3 py-1.5 rounded-full border transition-all ${active ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"}`}>
+                {o}
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+
+    function Input({ value, onChange, placeholder, type = "text" }) {
+      return (
+        <input type={type} value={value} onChange={onChange} placeholder={placeholder}
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+      );
+    }
+
+    function Textarea({ value, onChange, placeholder, rows = 3 }) {
+      return (
+        <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows}
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white resize-none" />
+      );
+    }
+
+    function Sel({ value, onChange, options, placeholder }) {
+      return (
+        <select value={value} onChange={onChange}
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
+          {placeholder && <option value="">{placeholder}</option>}
+          {options.map((o) => <option key={o}>{o}</option>)}
+        </select>
+      );
+    }
+
+    function FLabel({ children }) {
+      return <label className="block text-xs font-medium text-gray-500 mb-1">{children}</label>;
+    }
+
+    function FormSection({ title, children }) {
+      return (
+        <div>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-100">{title}</p>
+          {children}
+        </div>
+      );
+    }
+
+    function DetailRow({ label, value }) {
+      if (!value) return null;
+      return (
+        <div className="flex justify-between items-start py-2 border-b border-gray-50 last:border-0 gap-3">
+          <span className="text-xs text-gray-400 flex-shrink-0 w-32">{label}</span>
+          <span className="text-xs font-medium text-gray-800 text-right">{value}</span>
+        </div>
+      );
+    }
+
+    function DetailSection({ title, color = "bg-gray-50", children }) {
+      return (
+        <div>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{title}</p>
+          <div className={`${color} rounded-xl p-3`}>{children}</div>
+        </div>
+      );
+    }
+
+    // ─── Main Component ───────────────────────────────────────────────────────
+
+    function OpportunityTracker() {
+      const [opps, setOpps] = useState(SEED);
+      const [view, setView] = useState("kanban");
+      const [search, setSearch] = useState("");
+      const [filterStage, setFilterStage] = useState("All");
+      const [filterPlatform, setFilterPlatform] = useState("All");
+      const [modal, setModal] = useState(false);
+      const [editId, setEditId] = useState(null);
+      const [form, setForm] = useState(EMPTY);
+      const [detail, setDetail] = useState(null);
+      const [modalTab, setModalTab] = useState(0);
+
+      const allPlatforms = useMemo(() => {
+        const s = new Set(opps.map((o) => o.primaryPlatform).filter(Boolean));
+        return ["All", ...Array.from(s)];
+      }, [opps]);
+
+      const filtered = useMemo(() => opps.filter((o) => {
+        const q = search.toLowerCase();
+        const matchQ = !q || o.company.toLowerCase().includes(q) || o.pocName.toLowerCase().includes(q) || o.opportunityOwner.toLowerCase().includes(q);
+        const matchStage = filterStage === "All" || o.stage === filterStage;
+        const matchPlat = filterPlatform === "All" || o.primaryPlatform === filterPlatform;
+        return matchQ && matchStage && matchPlat;
+      }), [opps, search, filterStage, filterPlatform]);
+
+      const stats = useMemo(() => {
+        const active = opps.filter((o) => !["Won", "Lost"].includes(o.stage));
+        const won = opps.filter((o) => o.stage === "Won");
+        return {
+          total: opps.length,
+          active: active.length,
+          pipeline: active.reduce((s, o) => s + Number(o.potentialMonthlyRevenue || 0), 0),
+          won: won.reduce((s, o) => s + Number(o.potentialMonthlyRevenue || 0), 0),
+        };
+      }, [opps]);
+
+      const openAdd = () => { setForm({ ...EMPTY, opportunityCreationDate: today() }); setEditId(null); setModalTab(0); setModal(true); };
+      const openEdit = (opp) => { setForm({ ...opp }); setEditId(opp.id); setModalTab(0); setModal(true); };
+
+      const save = () => {
+        if (!form.company.trim()) return;
+        if (editId) {
+          const updated = { ...form, id: editId, lastUpdated: today() };
+          setOpps((prev) => prev.map((o) => o.id === editId ? updated : o));
+          if (detail && detail.id === editId) setDetail(updated);
+        } else {
+          setOpps((prev) => [...prev, { ...form, id: Date.now(), lastUpdated: today() }]);
+        }
+        setModal(false);
+      };
+
+      const remove = (id) => {
+        setOpps((prev) => prev.filter((o) => o.id !== id));
+        if (detail && detail.id === id) setDetail(null);
+      };
+
+      const shiftStage = (id, dir) => {
+        setOpps((prev) => prev.map((o) => {
+          if (o.id !== id) return o;
+          const idx = STAGES.indexOf(o.stage);
+          const ns = STAGES[idx + dir];
+          if (!ns) return o;
+          const u = { ...o, stage: ns, lastUpdated: today() };
+          if (detail && detail.id === id) setDetail(u);
+          return u;
+        }));
+      };
+
+      const f = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
+      const fArr = (key) => (val) => setForm((prev) => ({ ...prev, [key]: val }));
+
+      const MODAL_TABS = ["Client", "Platform", "Scope", "Commercial", "Pipeline"];
+
+      return (
+        <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+
+          {/* Header */}
+          <div className="bg-white border-b border-gray-100 px-6 pt-5 pb-4 sticky top-0 z-30 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
+                  <Target size={18} className="text-white" />
+                </div>
+                <div>
+                  <h1 className="text-base font-bold text-gray-900 leading-tight">Opportunity Tracker</h1>
+                  <p className="text-xs text-gray-400">Growth · Sales · Ops</p>
+                </div>
+              </div>
+              <button onClick={openAdd}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors shadow-sm">
+                <Plus size={15} /> Add Opportunity
+              </button>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              {[
+                { label: "Total Opps",       value: stats.total,            Icon: Target,       clr: "text-indigo-600", bg: "bg-indigo-50" },
+                { label: "Active Pipeline",  value: stats.active,           Icon: TrendingUp,   clr: "text-blue-600",   bg: "bg-blue-50" },
+                { label: "Monthly Pipeline", value: fmt(stats.pipeline),    Icon: DollarSign,   clr: "text-orange-500", bg: "bg-orange-50" },
+                { label: "Monthly Won",      value: fmt(stats.won),         Icon: CheckCircle,  clr: "text-green-600",  bg: "bg-green-50" },
+              ].map(({ label, value, Icon, clr, bg }) => (
+                <div key={label} className="bg-white border border-gray-100 rounded-xl p-3 flex items-center gap-3">
+                  <div className={`${bg} p-2 rounded-lg`}><Icon size={16} className={clr} /></div>
+                  <div>
+                    <p className="text-xs text-gray-400">{label}</p>
+                    <p className="text-sm font-bold text-gray-800">{value}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Controls */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="relative flex-1 min-w-48">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" style={{ top: "50%", transform: "translateY(-50%)" }} />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search company, POC, owner…"
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" />
+              </div>
+              <select value={filterStage} onChange={(e) => setFilterStage(e.target.value)}
+                className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                <option value="All">All Stages</option>
+                {STAGES.map((s) => <option key={s}>{s}</option>)}
+              </select>
+              <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)}
+                className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                {allPlatforms.map((p) => <option key={p} value={p}>{p === "All" ? "All Platforms" : p}</option>)}
+              </select>
+              <div className="flex border border-gray-200 rounded-xl overflow-hidden">
+                {[{ key: "kanban", Icon: LayoutGrid, label: "Board" }, { key: "list", Icon: List, label: "List" }].map(({ key, Icon, label }) => (
+                  <button key={key} onClick={() => setView(key)}
+                    className={`px-3 py-2 text-xs flex items-center gap-1.5 font-medium transition-colors ${view === key ? "bg-indigo-600 text-white" : "bg-white text-gray-500 hover:bg-gray-50"}`}>
+                    <Icon size={13} /> {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Kanban */}
+          {view === "kanban" && (
+            <div className="flex gap-3 p-5 overflow-x-auto" style={{ minHeight: "calc(100vh - 250px)" }}>
+              {STAGES.map((stage) => {
+                const m = STAGE_META[stage];
+                const cards = filtered.filter((o) => o.stage === stage);
+                return (
+                  <div key={stage} className="flex-shrink-0" style={{ width: 244 }}>
+                    <div className={`flex items-center justify-between px-3 py-2 rounded-xl mb-2 ${m.bg}`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${m.dot}`} />
+                        <span className={`text-xs font-semibold ${m.text}`}>{stage}</span>
+                      </div>
+                      <span className={`text-xs font-bold w-5 h-5 rounded-full bg-white flex items-center justify-center ${m.text}`}>{cards.length}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {cards.map((opp) => (
+                        <div key={opp.id} onClick={() => setDetail(opp)}
+                          className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group">
+                          <div className="flex items-start justify-between gap-1">
+                            <div style={{ minWidth: 0 }}>
+                              <p className="text-sm font-semibold text-gray-800 truncate">{opp.company}</p>
+                              <p className="text-xs text-gray-400 truncate mt-0.5">{opp.industry}</p>
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); openEdit(opp); }}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 rounded-lg transition-all flex-shrink-0">
+                              <Edit2 size={11} className="text-gray-400" />
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-1 mt-2 flex-wrap">
+                            {opp.primaryPlatform && <span className="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded-md font-medium">{opp.primaryPlatform}</span>}
+                            {opp.clientTimezone && <span className="text-xs bg-blue-50 text-blue-500 px-2 py-0.5 rounded-md">{opp.clientTimezone}</span>}
+                          </div>
+                          {opp.engagementType && <p className="text-xs text-gray-500 mt-1.5">{opp.engagementType}</p>}
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-xs font-bold text-gray-700">{fmt(opp.potentialMonthlyRevenue)}<span className="text-gray-400 font-normal">/mo</span></span>
+                            <span className="text-xs text-gray-300">{opp.lastUpdated}</span>
+                          </div>
+                          {opp.expertiseNeeded && opp.expertiseNeeded.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {opp.expertiseNeeded.slice(0, 2).map((s) => (
+                                <span key={s} className="text-xs bg-gray-50 text-gray-500 px-1.5 py-0.5 rounded-md border border-gray-100">{s}</span>
+                              ))}
+                              {opp.expertiseNeeded.length > 2 && <span className="text-xs text-gray-300">+{opp.expertiseNeeded.length - 2}</span>}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {cards.length === 0 && (
+                        <div className="border-2 border-dashed border-gray-100 rounded-xl py-6 text-center">
+                          <p className="text-xs text-gray-200">Empty</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* List View */}
+          {view === "list" && (
+            <div className="p-5">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      {["Company", "Industry", "Platform", "Engagement", "Monthly Rev", "Stage", "Owner", "TZ", ""].map((h) => (
+                        <th key={h} className="text-left text-xs font-semibold text-gray-400 px-3 py-3 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {filtered.map((opp) => (
+                      <tr key={opp.id} onClick={() => setDetail(opp)}
+                        className="hover:bg-indigo-50 transition-colors cursor-pointer group">
+                        <td className="px-3 py-3"><p className="font-semibold text-gray-800">{opp.company}</p><p className="text-xs text-gray-400">{opp.pocName}</p></td>
+                        <td className="px-3 py-3 text-xs text-gray-500">{opp.industry}</td>
+                        <td className="px-3 py-3">{opp.primaryPlatform && <span className="text-xs bg-violet-50 text-violet-600 px-2 py-1 rounded-md font-medium whitespace-nowrap">{opp.primaryPlatform}</span>}</td>
+                        <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{opp.engagementType}</td>
+                        <td className="px-3 py-3 font-bold text-gray-700 text-xs whitespace-nowrap">{fmt(opp.potentialMonthlyRevenue)}</td>
+                        <td className="px-3 py-3"><StagePill stage={opp.stage} /></td>
+                        <td className="px-3 py-3 text-xs text-gray-500">{opp.opportunityOwner}</td>
+                        <td className="px-3 py-3">{opp.clientTimezone && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-md font-medium">{opp.clientTimezone}</span>}</td>
+                        <td className="px-3 py-3">
+                          <button onClick={(e) => { e.stopPropagation(); openEdit(opp); }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-indigo-100 rounded-lg transition-all">
+                            <Edit2 size={13} className="text-indigo-500" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filtered.length === 0 && <div className="py-16 text-center"><p className="text-sm text-gray-300">No opportunities found.</p></div>}
+              </div>
+            </div>
+          )}
+
+          {/* Detail Panel */}
+          {detail && (
+            <div className="fixed inset-0 z-40 flex justify-end" style={{ backgroundColor: "rgba(0,0,0,0.2)" }} onClick={() => setDetail(null)}>
+              <div className="bg-white w-full max-w-md h-full overflow-y-auto shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+                <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-start justify-between z-10">
+                  <div>
+                    <h2 className="font-bold text-gray-900">{detail.company}</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">{detail.industry}</p>
+                    <div className="mt-2 flex gap-2 flex-wrap">
+                      <StagePill stage={detail.stage} />
+                      {detail.primaryPlatform && <Tag color="bg-violet-100 text-violet-700">{detail.primaryPlatform}</Tag>}
+                      {detail.clientTimezone && <Tag color="bg-blue-100 text-blue-700">{detail.clientTimezone}</Tag>}
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => { openEdit(detail); setDetail(null); }} className="p-2 hover:bg-indigo-50 rounded-xl transition-colors">
+                      <Edit2 size={15} className="text-indigo-500" />
+                    </button>
+                    <button onClick={() => setDetail(null)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+                      <X size={15} className="text-gray-400" />
+                    </button>
+                  </div>
+                </div>
+                <div className="p-5 space-y-5 flex-1">
+                  <div className="flex gap-2">
+                    <button onClick={() => shiftStage(detail.id, -1)} disabled={STAGES.indexOf(detail.stage) === 0}
+                      className="flex-1 flex items-center justify-center gap-1 py-2 text-xs font-medium border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                      <ChevronLeft size={13} /> Previous
+                    </button>
+                    <button onClick={() => shiftStage(detail.id, 1)} disabled={STAGES.indexOf(detail.stage) === STAGES.length - 1}
+                      className="flex-1 flex items-center justify-center gap-1 py-2 text-xs font-medium bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed">
+                      Next Stage <ChevronRight size={13} />
+                    </button>
+                  </div>
+
+                  <DetailSection title="Client & Contact">
+                    <DetailRow label="Company" value={detail.company} />
+                    <DetailRow label="Domain" value={detail.industry} />
+                    <DetailRow label="POC Name" value={detail.pocName} />
+                    <DetailRow label="POC Email" value={detail.pocEmail} />
+                    <DetailRow label="POC Phone" value={detail.pocPhone} />
+                    <DetailRow label="Opp Owner" value={detail.opportunityOwner} />
+                    <DetailRow label="Assigned Sales" value={detail.assignedToSales || "Unassigned"} />
+                    <DetailRow label="Created On" value={detail.opportunityCreationDate} />
+                  </DetailSection>
+
+                  <DetailSection title="Engagement">
+                    <DetailRow label="Type" value={detail.engagementType} />
+                    <DetailRow label="Billing Model" value={detail.billingModel} />
+                    <DetailRow label="Est. Hours" value={detail.estimatedHours ? `${detail.estimatedHours} hrs/mo` : null} />
+                    <DetailRow label="Monthly Rev" value={detail.potentialMonthlyRevenue ? `${fmt(detail.potentialMonthlyRevenue)}/mo` : null} />
+                    {detail.expertiseNeeded && detail.expertiseNeeded.length > 0 && (
+                      <div className="pt-2">
+                        <p className="text-xs text-gray-400 mb-2">Expertise Needed</p>
+                        <div className="flex flex-wrap gap-1.5">{detail.expertiseNeeded.map((e) => <Tag key={e}>{e}</Tag>)}</div>
+                      </div>
+                    )}
+                  </DetailSection>
+
+                  <DetailSection title="Platform & Technology" color="bg-violet-50">
+                    <DetailRow label="Primary Platform" value={detail.primaryPlatform} />
+                    {detail.additionalTools && detail.additionalTools.length > 0 && (
+                      <div className="pt-2">
+                        <p className="text-xs text-gray-400 mb-2">Additional Tools</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {detail.additionalTools.map((t) => <Tag key={t} color="bg-white text-violet-700">{t}</Tag>)}
+                        </div>
+                      </div>
+                    )}
+                  </DetailSection>
+
+                  {detail.problemStatement && (
+                    <DetailSection title="Problem Statement" color="bg-amber-50">
+                      <p className="text-xs text-gray-700 leading-relaxed">{detail.problemStatement}</p>
+                    </DetailSection>
+                  )}
+
+                  <DetailSection title="Scope of Work">
+                    <p className="text-xs text-gray-700 leading-relaxed">{detail.scopeOfWork || "—"}</p>
+                    <div className="grid grid-cols-3 gap-2 mt-3">
+                      {[
+                        { label: "Campaigns/mo", v: detail.campaignsPerMonth },
+                        { label: "Templates/mo", v: detail.templatesPerMonth },
+                        { label: "Automations", v: detail.automationsRequired },
+                      ].map(({ label, v }) => v ? (
+                        <div key={label} className="bg-white rounded-lg p-2 text-center border border-gray-100">
+                          <p className="text-sm font-bold text-gray-800">{v}</p>
+                          <p className="text-xs text-gray-400">{label}</p>
+                        </div>
+                      ) : null)}
+                    </div>
+                    <div className="mt-3 space-y-1.5">
+                      {detail.copywritingRequirement && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-400">Copywriting</span>
+                          <Tag color="bg-orange-50 text-orange-700">{detail.copywritingRequirement}</Tag>
+                        </div>
+                      )}
+                      {detail.emailProductionRequirement && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-400">Email Production</span>
+                          <Tag color="bg-pink-50 text-pink-700">{detail.emailProductionRequirement}</Tag>
+                        </div>
+                      )}
+                    </div>
+                  </DetailSection>
+
+                  {(detail.clientTimezone || detail.supportWindow) && (
+                    <DetailSection title="Timezone & Support" color="bg-blue-50">
+                      <DetailRow label="Timezone" value={detail.clientTimezone} />
+                      <DetailRow label="Support Window" value={detail.supportWindow} />
+                    </DetailSection>
+                  )}
+
+                  {detail.salesNotes && (
+                    <DetailSection title="Sales Notes" color="bg-sky-50">
+                      <p className="text-xs text-gray-700 leading-relaxed">{detail.salesNotes}</p>
+                    </DetailSection>
+                  )}
+                  {detail.debriefNotes && (
+                    <DetailSection title="Ops Debrief" color="bg-emerald-50">
+                      <p className="text-xs text-gray-700 leading-relaxed">{detail.debriefNotes}</p>
+                    </DetailSection>
+                  )}
+
+                  <button onClick={() => remove(detail.id)}
+                    className="w-full py-2 text-xs font-medium text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl border border-red-100 transition-colors">
+                    Delete Opportunity
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add / Edit Modal */}
+          {modal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+              <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col" style={{ maxHeight: "92vh" }}>
+                <div className="sticky top-0 bg-white border-b border-gray-100 px-6 pt-4 z-10 rounded-t-2xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="font-bold text-gray-900">{editId ? "Edit Opportunity" : "Add New Opportunity"}</h2>
+                    <button onClick={() => setModal(false)} className="p-2 hover:bg-gray-100 rounded-xl"><X size={16} className="text-gray-400" /></button>
+                  </div>
+                  <div className="flex gap-1 overflow-x-auto pb-px">
+                    {MODAL_TABS.map((t, i) => (
+                      <button key={t} onClick={() => setModalTab(i)}
+                        className={`text-xs font-medium px-3 py-2 rounded-t-lg whitespace-nowrap transition-colors ${modalTab === i ? "bg-indigo-600 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-6 overflow-y-auto flex-1">
+                  {/* Tab 0: Client */}
+                  {modalTab === 0 && (
+                    <FormSection title="Client & Contact">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="col-span-2"><FLabel>Company Name *</FLabel><Input value={form.company} onChange={f("company")} placeholder="e.g. Zara Ventures" /></div>
+                        <div><FLabel>Domain / Industry</FLabel><Input value={form.industry} onChange={f("industry")} placeholder="e.g. Retail / E-commerce" /></div>
+                        <div><FLabel>Source</FLabel><Sel value={form.source} onChange={f("source")} options={SOURCES} placeholder="Select source" /></div>
+                        <div><FLabel>POC Name</FLabel><Input value={form.pocName} onChange={f("pocName")} placeholder="Full name" /></div>
+                        <div><FLabel>POC Email</FLabel><Input value={form.pocEmail} onChange={f("pocEmail")} placeholder="email@company.com" type="email" /></div>
+                        <div><FLabel>POC Phone</FLabel><Input value={form.pocPhone} onChange={f("pocPhone")} placeholder="+91 …" /></div>
+                        <div><FLabel>Opportunity Owner (CSM / AM)</FLabel><Input value={form.opportunityOwner} onChange={f("opportunityOwner")} placeholder="e.g. Ravi (CSM)" /></div>
+                        <div><FLabel>Assigned To (Sales)</FLabel><Input value={form.assignedToSales} onChange={f("assignedToSales")} placeholder="e.g. Anita (Sales)" /></div>
+                        <div><FLabel>Opportunity Creation Date</FLabel><Input value={form.opportunityCreationDate} onChange={f("opportunityCreationDate")} type="date" /></div>
+                      </div>
+                    </FormSection>
+                  )}
+
+                  {/* Tab 1: Platform */}
+                  {modalTab === 1 && (
+                    <div className="space-y-5">
+                      <FormSection title="Platform & Technology">
+                        <div className="mb-4"><FLabel>Primary CRM / Marketing Platform</FLabel><Sel value={form.primaryPlatform} onChange={f("primaryPlatform")} options={PRIMARY_PLATFORMS} placeholder="Select platform" /></div>
+                        <div><FLabel>Additional Tools / Platforms</FLabel><MultiSelect options={ADDITIONAL_TOOLS_LIST} selected={form.additionalTools} onChange={fArr("additionalTools")} /></div>
+                      </FormSection>
+                      <FormSection title="Problem Statement">
+                        <Textarea value={form.problemStatement} onChange={f("problemStatement")} rows={4} placeholder={"What the client needs\nWhy they need it\nWhat outcome they expect"} />
+                      </FormSection>
+                    </div>
+                  )}
+
+                  {/* Tab 2: Scope */}
+                  {modalTab === 2 && (
+                    <div className="space-y-5">
+                      <FormSection title="Engagement Type & Expertise">
+                        <div className="mb-4">
+                          <FLabel>Engagement Type</FLabel>
+                          <div className="flex flex-wrap gap-2">
+                            {ENGAGEMENT_TYPES.map((t) => (
+                              <button key={t} type="button" onClick={() => setForm((p) => ({ ...p, engagementType: t }))}
+                                className={`text-xs px-3 py-2 rounded-xl border transition-all ${form.engagementType === t ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"}`}>
+                                {t}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div><FLabel>Expertise Needed</FLabel><MultiSelect options={EXPERTISE} selected={form.expertiseNeeded} onChange={fArr("expertiseNeeded")} /></div>
+                      </FormSection>
+                      <FormSection title="Scope of Work">
+                        <Textarea value={form.scopeOfWork} onChange={f("scopeOfWork")} rows={3} placeholder="Deliverables, responsibilities, expected outputs, timeline…" />
+                      </FormSection>
+                      <FormSection title="Expected Volume">
+                        <div className="grid grid-cols-3 gap-3">
+                          <div><FLabel>Campaigns / Month</FLabel><Input value={form.campaignsPerMonth} onChange={f("campaignsPerMonth")} placeholder="e.g. 8" /></div>
+                          <div><FLabel>Templates / Month</FLabel><Input value={form.templatesPerMonth} onChange={f("templatesPerMonth")} placeholder="e.g. 12" /></div>
+                          <div><FLabel>Automations</FLabel><Input value={form.automationsRequired} onChange={f("automationsRequired")} placeholder="e.g. 5" /></div>
+                        </div>
+                      </FormSection>
+                      <FormSection title="Copywriting Requirement">
+                        <div className="flex flex-wrap gap-2">
+                          {COPYWRITING_OPTS.map((o) => (
+                            <button key={o} type="button" onClick={() => setForm((p) => ({ ...p, copywritingRequirement: o }))}
+                              className={`text-xs px-3 py-2 rounded-xl border transition-all ${form.copywritingRequirement === o ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"}`}>
+                              {o}
+                            </button>
+                          ))}
+                        </div>
+                      </FormSection>
+                      <FormSection title="Email Production Requirement">
+                        <div className="flex flex-wrap gap-2">
+                          {EMAIL_PROD_OPTS.map((o) => (
+                            <button key={o} type="button" onClick={() => setForm((p) => ({ ...p, emailProductionRequirement: o }))}
+                              className={`text-xs px-3 py-2 rounded-xl border transition-all ${form.emailProductionRequirement === o ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"}`}>
+                              {o}
+                            </button>
+                          ))}
+                        </div>
+                      </FormSection>
+                    </div>
+                  )}
+
+                  {/* Tab 3: Commercial */}
+                  {modalTab === 3 && (
+                    <div className="space-y-5">
+                      <FormSection title="Commercial Details">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div><FLabel>Estimated Hours / Month</FLabel><Input value={form.estimatedHours} onChange={f("estimatedHours")} placeholder="e.g. 80" type="number" /></div>
+                          <div><FLabel>Potential Monthly Revenue (₹)</FLabel><Input value={form.potentialMonthlyRevenue} onChange={f("potentialMonthlyRevenue")} placeholder="e.g. 120000" type="number" /></div>
+                        </div>
+                        <div className="mt-3">
+                          <FLabel>Billing Model</FLabel>
+                          <div className="flex gap-2 mt-1">
+                            {BILLING_MODELS.map((b) => (
+                              <button key={b} type="button" onClick={() => setForm((p) => ({ ...p, billingModel: b }))}
+                                className={`text-xs px-4 py-2 rounded-xl border flex-1 transition-all ${form.billingModel === b ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"}`}>
+                                {b}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </FormSection>
+                      <FormSection title="Timezone & Support">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <FLabel>Client Timezone</FLabel>
+                            <div className="flex gap-2">
+                              {TIMEZONES.map((tz) => (
+                                <button key={tz} type="button" onClick={() => setForm((p) => ({ ...p, clientTimezone: tz }))}
+                                  className={`text-xs px-3 py-2 rounded-xl border flex-1 transition-all ${form.clientTimezone === tz ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"}`}>
+                                  {tz}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div><FLabel>Support Window</FLabel><Input value={form.supportWindow} onChange={f("supportWindow")} placeholder="e.g. 9 AM – 5 PM AEST" /></div>
+                        </div>
+                      </FormSection>
+                    </div>
+                  )}
+
+                  {/* Tab 4: Pipeline */}
+                  {modalTab === 4 && (
+                    <div className="space-y-5">
+                      <FormSection title="Pipeline Stage">
+                        <div className="grid grid-cols-2 gap-2">
+                          {STAGES.map((s) => {
+                            const m = STAGE_META[s];
+                            return (
+                              <button key={s} type="button" onClick={() => setForm((p) => ({ ...p, stage: s }))}
+                                className={`text-xs px-3 py-2.5 rounded-xl border text-left transition-all flex items-center gap-2 ${form.stage === s ? `${m.bg} ${m.text} font-semibold` : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"}`}>
+                                <span className={`w-2 h-2 rounded-full ${m.dot}`} />{s}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </FormSection>
+                      <FormSection title="Notes">
+                        <div className="space-y-3">
+                          <div><FLabel>Sales Notes</FLabel><Textarea value={form.salesNotes} onChange={f("salesNotes")} rows={3} placeholder="Notes for the Sales team…" /></div>
+                          <div><FLabel>Ops Debrief Notes</FLabel><Textarea value={form.debriefNotes} onChange={f("debriefNotes")} rows={3} placeholder="Post-closure debrief notes for Ops team…" /></div>
+                        </div>
+                      </FormSection>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+                  <button onClick={() => setModal(false)}
+                    className="flex-1 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                    Cancel
+                  </button>
+                  {modalTab > 0 && (
+                    <button onClick={() => setModalTab((t) => t - 1)}
+                      className="px-5 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                      ← Back
+                    </button>
+                  )}
+                  {modalTab < MODAL_TABS.length - 1 ? (
+                    <button onClick={() => setModalTab((t) => t + 1)}
+                      className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors">
+                      Next →
+                    </button>
+                  ) : (
+                    <button onClick={save}
+                      className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors shadow-sm">
+                      {editId ? "Save Changes" : "Add Opportunity"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // Mount
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<OpportunityTracker />);
+  </script>
+</body>
+</html>
