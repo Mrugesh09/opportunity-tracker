@@ -22,7 +22,7 @@
 <body>
   <div id="root"></div>
   <script type="text/babel">
-    const { useState, useEffect, useCallback, useMemo } = React;
+    const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
     const SUPA_URL = "https://cwqsrkdqzmdtwhiyshre.supabase.co";
     const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3cXNya2Rxem1kdHdoaXlzaHJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MzE5NTcsImV4cCI6MjA5MDAwNzk1N30.OtoggcPrwOS8dDvWMm4p3wDD10ecHoZ3N2swRIPH0Zc";
@@ -39,16 +39,14 @@
       "Lost":          {bg:"bg-red-50",      text:"text-red-700",    dot:"bg-red-500",    border:"border-red-200"   },
       "On Hold":       {bg:"bg-slate-100",   text:"text-slate-600",  dot:"bg-slate-400",  border:"border-slate-200" },
     };
-    const SOURCES       = ["Inbound","Outbound","Referral","LinkedIn","Event","Partner","Other"];
+    const SOURCES       = ["NBD","Existing Client"];
     const PLATFORMS     = ["Salesforce Marketing Cloud","Braze","Marketo","HubSpot","Klaviyo","Iterable","Bloomreach","Customer.io","Other"];
-    const ADD_TOOLS     = ["Segment","Snowflake","GA4","Amplitude","Shopify","BigQuery","CDP","Figma","Litmus"];
     const ENG_TYPES     = ["Dedicated Resource","Recurring Engagement","Project-to-Project"];
-    const EXPERTISE     = ["Consulting / Strategy","Campaign Execution","Marketing Automation","Design","Copywriting","Template Production","Data / CDP","CRM Migration"];
-    const BILLING       = ["Dedicated","Shared","Project-Based"];
+    const EXPERTISE     = ["Consulting / Strategy","Campaign / Automation Management","Design","Copywriting","Template Production","CRM Migration"];
     const TIMEZONES     = ["AU","EU","US","Other"];
     const COPY_OPTS     = ["AI-Driven","AI + Human","Highly Creative"];
     const EMAIL_OPTS    = ["AI Generated Templates","Drag & Drop Builder","Custom HTML"];
-    const MODAL_TABS    = ["Client","Engagement","Problem","Platform","Scope","Decision","Pipeline"];
+    const MODAL_TABS    = ["Client","Engagement","Problem","Scope","Decision","Pipeline"];
     const ROLE_META     = {
       admin:  {label:"Admin",  bg:"bg-[#1B1B1B]",   text:"text-[#FFDD2F]"},
       sales:  {label:"Sales",  bg:"bg-blue-600",     text:"text-white"    },
@@ -78,6 +76,7 @@
 
     const fmtINR = n => { const v=Number(n)||0; if(v>=10000000) return `₹${(v/10000000).toFixed(1)}Cr`; if(v>=100000) return `₹${(v/100000).toFixed(1)}L`; if(v>=1000) return `₹${(v/1000).toFixed(0)}K`; return `₹${v}`; };
     const fmtDate = s => s ? new Date(s).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"2-digit"}) : "—";
+    const todayStr = () => new Date().toISOString().slice(0,10);
 
     const Spinner = ({sz="w-6 h-6",c="border-[#FFDD2F]"}) => <div className={`${sz} border-2 ${c} border-t-transparent rounded-full spin`} />;
     const StageBadge = ({stage}) => { const m=STAGE_META[stage]||STAGE_META["New Lead"]; return <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${m.bg} ${m.text} ${m.border}`}><span className={`w-1.5 h-1.5 rounded-full ${m.dot}`}/>{stage||"New Lead"}</span>; };
@@ -189,22 +188,49 @@
       </div>
     );
 
-    const blankForm = () => ({clientName:"",industry:"",clientSize:"",website:"",source:"",pocName:"",pocTitle:"",pocEmail:"",pocPhone:"",opportunityOwner:"",assignedToSales:"",opportunityCreationDate:"",engagementType:"",expertiseNeeded:[],problemStatement:"",urgency:"",successDefinition:"",primaryPlatform:"",additionalTools:[],scopeOfWork:"",copywritingRequirement:"",emailProductionRequirement:"",decisionMaker:"",decisionTimeline:"",budgetRange:"",competingVendors:"",estimatedHours:"",potentialMonthlyRevenue:"",billingModel:"",clientTimezone:"",supportWindow:"",stage:"New Lead",salesNotes:"",debriefNotes:"",additionalNotes:""});
+    const blankForm = () => ({
+      clientName:"", industry:"", clientSize:"", website:"", source:"",
+      pocName:"", pocTitle:"", pocEmail:"", pocPhone:"",
+      opportunityOwner:"", assignedToSales:"",
+      opportunityCreationDate: todayStr(),
+      engagementType:"", expertiseNeeded:[], expertiseOther:"",
+      problemStatement:"", successDefinition:"",
+      platforms:[],
+      discoveryCallUrl:"", onboardingCallUrl:"",
+      scopeOfWork:"", copywritingRequirement:"", emailProductionRequirement:"",
+      budgetRange:"", estimatedHours:"", potentialMonthlyRevenue:"",
+      projectCost:"", projectTimeline:"",
+      clientTimezone:"", supportWindow:"",
+      stage:"New Lead", salesNotes:"", debriefNotes:"", additionalNotes:""
+    });
 
     const OppModal = ({editData,userId,role,onClose,onSaved}) => {
       const ops = role==="ops";
       const isEdit = !!editData;
-      const [form,setForm] = useState(editData?{...editData}:blankForm());
-      const [tab,setTab]   = useState(ops?6:0);
+      const initForm = isEdit ? {
+        ...blankForm(),
+        ...editData,
+        platforms: editData.platforms || (editData.primaryPlatform ? [editData.primaryPlatform] : []),
+        expertiseOther: editData.expertiseOther || "",
+      } : blankForm();
+      const [form,setForm] = useState(initForm);
+      const [tab,setTab]   = useState(ops?5:0);
       const [busy,setBusy] = useState(false);
       const [err,setErr]   = useState("");
       const f  = k => e => setForm(p=>({...p,[k]:e.target.value}));
       const fv = k => v => setForm(p=>({...p,[k]:v}));
+      const hasCopywriting   = (form.expertiseNeeded||[]).includes("Copywriting");
+      const hasEmailProd     = (form.expertiseNeeded||[]).includes("Template Production");
+      const isP2P            = form.engagementType === "Project-to-Project";
       const save = async () => {
         if(!ops&&!form.clientName){ setErr("Client name is required."); setTab(0); return; }
         setBusy(true); setErr("");
         try {
-          const payload = {...form,owner_id:isEdit?(editData.owner_id||userId):userId};
+          const payload = {
+            ...form,
+            primaryPlatform: (form.platforms||[])[0] || "",
+            owner_id: isEdit ? (editData.owner_id||userId) : userId
+          };
           if(isEdit){ await dbO.upd(editData.id,payload); onSaved({id:editData.id,created_at:editData.created_at,...payload}); }
           else { const c=await dbO.add(payload); onSaved(c); }
           onClose();
@@ -243,70 +269,73 @@
           <FSec title="Expertise Needed">
             <p className="text-xs text-gray-400 mb-3">Select ALL that apply — determines which teams are involved.</p>
             <MTog options={EXPERTISE} values={form.expertiseNeeded} onChange={fv("expertiseNeeded")} disabled={ops}/>
+            <div className="mt-3">
+              <FLabel>Other (specify)</FLabel>
+              <FInput value={form.expertiseOther} onChange={f("expertiseOther")} placeholder="Describe any additional expertise needed…" disabled={ops}/>
+            </div>
           </FSec>
         </div>,
         // ── Tab 2: Problem ───────────────────────────────────────────────
         <div key="prob" className="space-y-4">
           <FSec title="Problem Statement">
-            <p className="text-xs text-gray-400 mb-3">Answer all three — this should be compelling enough for an internal pitch.</p>
+            <p className="text-xs text-gray-400 mb-3">Answer both questions — this should be compelling enough for an internal pitch.</p>
             <div className="space-y-3">
-              <div><FLabel>What challenge or gap is the client trying to solve?</FLabel><FTxt value={form.problemStatement} onChange={f("problemStatement")} rows={3} placeholder="e.g. Client has no in-house expertise to manage Braze campaigns and is missing key lifecycle triggers." disabled={ops}/></div>
-              <div><FLabel>Why is this a priority right now? (Urgency / trigger)</FLabel><FTxt value={form.urgency} onChange={f("urgency")} rows={3} placeholder="e.g. They are migrating from Mailchimp to Braze and need to go live within 60 days." disabled={ops}/></div>
-              <div><FLabel>What does success look like to the client?</FLabel><FTxt value={form.successDefinition} onChange={f("successDefinition")} rows={3} placeholder="e.g. Fully configured Braze instance with 3 onboarding flows and ongoing campaign execution support." disabled={ops}/></div>
+              <div><FLabel>What challenge or gap is the client trying to solve?</FLabel><FTxt value={form.problemStatement} onChange={f("problemStatement")} rows={4} placeholder="e.g. Client has no in-house expertise to manage Braze campaigns and is missing key lifecycle triggers." disabled={ops}/></div>
+              <div><FLabel>What does success look like to the client?</FLabel><FTxt value={form.successDefinition} onChange={f("successDefinition")} rows={4} placeholder="e.g. Fully configured Braze instance with 3 onboarding flows and ongoing campaign execution support." disabled={ops}/></div>
             </div>
           </FSec>
         </div>,
-        // ── Tab 3: Platform ──────────────────────────────────────────────
-        <div key="plat" className="space-y-4">
-          <FSec title="Platform & Technology">
-            <div className="mb-3">
-              <FLabel>Primary CRM / Marketing Platform</FLabel>
-              <p className="text-xs text-gray-400 mb-2">Select the platform that will be the main focus of the engagement.</p>
-              <FSel value={form.primaryPlatform} onChange={f("primaryPlatform")} options={PLATFORMS} placeholder="Select platform" disabled={ops}/>
-            </div>
-            <div>
-              <FLabel>Additional Tools / Integrations</FLabel>
-              <p className="text-xs text-gray-400 mb-2">Select all connected tools in their stack.</p>
-              <MTog options={ADD_TOOLS} values={form.additionalTools} onChange={fv("additionalTools")} disabled={ops}/>
-            </div>
-          </FSec>
-        </div>,
-        // ── Tab 4: Scope ─────────────────────────────────────────────────
+        // ── Tab 3: Scope ─────────────────────────────────────────────────
         <div key="scope" className="space-y-4">
+          <FSec title="Platform & Technology">
+            <p className="text-xs text-gray-400 mb-2">Select all platforms in scope — multiple allowed.</p>
+            <MTog options={PLATFORMS} values={form.platforms||[]} onChange={fv("platforms")} disabled={ops}/>
+          </FSec>
+          <FSec title="Call Recordings">
+            <div className="grid grid-cols-1 gap-3">
+              <div><FLabel>Discovery Call Recording URL</FLabel><FInput value={form.discoveryCallUrl} onChange={f("discoveryCallUrl")} placeholder="https://drive.google.com/… or Loom / Zoom link" disabled={ops}/></div>
+              <div><FLabel>Onboarding Call Recording URL</FLabel><FInput value={form.onboardingCallUrl} onChange={f("onboardingCallUrl")} placeholder="https://drive.google.com/… or Loom / Zoom link" disabled={ops}/></div>
+            </div>
+          </FSec>
           <FSec title="Scope of Work">
             <FTxt value={form.scopeOfWork} onChange={f("scopeOfWork")} placeholder="List what Mavlers will own vs. what the client handles. Be specific about expected deliverables and outputs." rows={4} disabled={ops}/>
           </FSec>
-          <FSec title="Copywriting Requirement">
-            <p className="text-xs text-gray-400 mb-3">Complete only if copywriting is in scope. Select ONE.</p>
-            <Tog options={COPY_OPTS} value={form.copywritingRequirement} onChange={fv("copywritingRequirement")} disabled={ops}/>
-            <p className="text-xs text-gray-400 mt-2">AI-Driven = fastest, high volume · AI + Human = balanced · Highly Creative = full human-led</p>
-          </FSec>
-          <FSec title="Email Production Requirement">
-            <p className="text-xs text-gray-400 mb-3">Complete only if email/template production is in scope. Select ONE.</p>
-            <Tog options={EMAIL_OPTS} value={form.emailProductionRequirement} onChange={fv("emailProductionRequirement")} disabled={ops}/>
-          </FSec>
+          {hasCopywriting && (
+            <FSec title="Copywriting Requirement">
+              <p className="text-xs text-gray-400 mb-3">Select ONE — applies since Copywriting is in scope.</p>
+              <Tog options={COPY_OPTS} value={form.copywritingRequirement} onChange={fv("copywritingRequirement")} disabled={ops}/>
+              <p className="text-xs text-gray-400 mt-2">AI-Driven = fastest, high volume · AI + Human = balanced · Highly Creative = full human-led</p>
+            </FSec>
+          )}
+          {hasEmailProd && (
+            <FSec title="Email Production Requirement">
+              <p className="text-xs text-gray-400 mb-3">Select ONE — applies since Template Production is in scope.</p>
+              <Tog options={EMAIL_OPTS} value={form.emailProductionRequirement} onChange={fv("emailProductionRequirement")} disabled={ops}/>
+            </FSec>
+          )}
         </div>,
-        // ── Tab 5: Decision ──────────────────────────────────────────────
+        // ── Tab 4: Decision ──────────────────────────────────────────────
         <div key="dec" className="space-y-4">
-          <FSec title="Decision & Qualification">
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div><FLabel>Decision Maker (Name & Title)</FLabel><FInput value={form.decisionMaker} onChange={f("decisionMaker")} placeholder="e.g. John Smith, VP Marketing" disabled={ops}/></div>
-              <div><FLabel>Expected Decision Timeline</FLabel><FInput value={form.decisionTimeline} onChange={f("decisionTimeline")} placeholder="e.g. Within 2 weeks, End of Q2" disabled={ops}/></div>
-              <div className="col-span-2"><FLabel>Budget Range (if shared)</FLabel><FInput value={form.budgetRange} onChange={f("budgetRange")} placeholder="e.g. ₹5–8L / month, or $10K–15K / month" disabled={ops}/></div>
-            </div>
-            <div><FLabel>Competing Solutions / Vendors Being Considered</FLabel><FTxt value={form.competingVendors} onChange={f("competingVendors")} rows={3} placeholder="e.g. Client is also evaluating Accenture and an in-house hire. Note any context that affects our positioning." disabled={ops}/></div>
+          <FSec title="Budget">
+            <div><FLabel>Budget Range (if shared)</FLabel><FInput value={form.budgetRange} onChange={f("budgetRange")} placeholder="e.g. ₹5–8L / month, or $10K–15K / month" disabled={ops}/></div>
           </FSec>
           <FSec title="Commercial Details">
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div><FLabel>Est. Hours / Month</FLabel><FInput type="number" value={form.estimatedHours} onChange={f("estimatedHours")} placeholder="e.g. 80" disabled={ops}/></div>
-              <div><FLabel>Potential Monthly Revenue (₹)</FLabel><FInput type="number" value={form.potentialMonthlyRevenue} onChange={f("potentialMonthlyRevenue")} placeholder="e.g. 120000" disabled={ops}/></div>
-            </div>
-            <div className="mb-3"><FLabel>Billing Model</FLabel><Tog options={BILLING} value={form.billingModel} onChange={fv("billingModel")} disabled={ops}/></div>
-            <div className="mb-3"><FLabel>Client Timezone</FLabel><Tog options={TIMEZONES} value={form.clientTimezone} onChange={fv("clientTimezone")} disabled={ops}/></div>
-            <div><FLabel>Support Window</FLabel><FInput value={form.supportWindow} onChange={f("supportWindow")} placeholder="e.g. 9 AM – 5 PM AEST, Mon–Fri" disabled={ops}/></div>
+            {isP2P ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div><FLabel>Project Cost (₹)</FLabel><FInput type="number" value={form.projectCost} onChange={f("projectCost")} placeholder="e.g. 500000" disabled={ops}/></div>
+                <div><FLabel>Project Timeline</FLabel><FInput value={form.projectTimeline} onChange={f("projectTimeline")} placeholder="e.g. 6 weeks, 3 months" disabled={ops}/></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div><FLabel>Est. Hours / Month</FLabel><FInput type="number" value={form.estimatedHours} onChange={f("estimatedHours")} placeholder="e.g. 80" disabled={ops}/></div>
+                <div><FLabel>Potential Monthly Revenue (₹)</FLabel><FInput type="number" value={form.potentialMonthlyRevenue} onChange={f("potentialMonthlyRevenue")} placeholder="e.g. 120000" disabled={ops}/></div>
+              </div>
+            )}
+            <div className="mt-3"><FLabel>Client Timezone</FLabel><Tog options={TIMEZONES} value={form.clientTimezone} onChange={fv("clientTimezone")} disabled={ops}/></div>
+            <div className="mt-3"><FLabel>Support Window</FLabel><FInput value={form.supportWindow} onChange={f("supportWindow")} placeholder="e.g. 9 AM – 5 PM AEST, Mon–Fri" disabled={ops}/></div>
           </FSec>
         </div>,
-        // ── Tab 6: Pipeline ──────────────────────────────────────────────
+        // ── Tab 5: Pipeline ──────────────────────────────────────────────
         <div key="pip" className="space-y-4">
           <FSec title="Pipeline Stage">
             <div className="grid grid-cols-2 gap-2">
@@ -340,219 +369,9 @@
             <div className="flex-1 overflow-y-auto p-4">{tabs[tab]}</div>
             {err && <p className="text-xs text-red-600 bg-red-50 px-5 py-2 border-t border-red-100">{err}</p>}
             <div className="flex gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50">
-              <button onClick={onClose} className="py-2.5 px-4 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-white transition-colors">Cancel</button>
-              {!ops && tab>0 && <button type="button" onClick={()=>setTab(t=>t-1)} className="py-2.5 px-4 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-white transition-colors">← Back</button>}
-              <div className="flex-1"/>
-              {!ops && tab<MODAL_TABS.length-1
-                ? <button type="button" onClick={()=>setTab(t=>t+1)} className="py-2.5 px-5 bg-[#FFDD2F] text-[#1B1B1B] rounded-xl text-sm font-bold hover:bg-[#f5d000] transition-colors">Next →</button>
-                : <button type="button" onClick={save} disabled={busy} className="py-2.5 px-5 bg-[#1B1B1B] text-[#FFDD2F] rounded-xl text-sm font-bold hover:bg-black disabled:opacity-60 flex items-center gap-2 transition-colors">{busy?<><Spinner sz="w-4 h-4"/>Saving…</>:isEdit?"Save Changes":"Add Opportunity"}</button>
-              }
-            </div>
-          </div>
-        </div>
-      );
-    };
-
-    const TeamPage = () => {
-      const [list,setList] = useState([]);
-      const [roles,setRoles] = useState([]);
-      const [loading,setLoading] = useState(true);
-      const [form,setForm] = useState({email:"",role:"sales",full_name:""});
-      const [busy,setBusy] = useState(false);
-      const [err,setErr] = useState("");
-      const [ok,setOk] = useState("");
-      useEffect(()=>{ Promise.all([dbT.list(),dbT.roles()]).then(([l,r])=>{ setList(l); setRoles(r); }).catch(()=>{}).finally(()=>setLoading(false)); },[]);
-      const add = async e => {
-        e.preventDefault(); setBusy(true); setErr(""); setOk("");
-        try { await dbT.add(form.email.toLowerCase().trim(),form.role,form.full_name.trim()); const l=await dbT.list(); setList(l); setOk(`${form.email} added as ${form.role}. Share the app URL so they can sign up.`); setForm({email:"",role:"sales",full_name:""}); }
-        catch(er){ setErr(er.message||"Failed."); }
-        setBusy(false);
-      };
-      const rm = async (id,email) => {
-        if(!confirm(`Remove ${email}?`)) return;
-        try { await dbT.remove(id); setList(l=>l.filter(a=>a.id!==id)); } catch(er){ setErr(er.message); }
-      };
-      if(loading) return <div className="flex justify-center p-12"><Spinner/></div>;
-      return (
-        <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-5">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-[#1B1B1B] mb-4">Invite Team Member</h3>
-            <form onSubmit={add} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div><FLabel>Full Name</FLabel><FInput value={form.full_name} onChange={e=>setForm(p=>({...p,full_name:e.target.value}))} placeholder="Anita Sharma"/></div>
-                <div><FLabel req>Role</FLabel><select value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))} className={`${iCls} bg-white`}><option value="sales">Sales</option><option value="growth">Growth</option><option value="ops">Ops</option><option value="admin">Admin</option></select></div>
-              </div>
-              <div><FLabel req>Work Email</FLabel><FInput type="email" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} placeholder="name@mavlers.com" required/></div>
-              {err && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</p>}
-              {ok  && <p className="text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2">{ok}</p>}
-              <button type="submit" disabled={busy} className="w-full py-2.5 bg-[#FFDD2F] text-[#1B1B1B] rounded-xl text-sm font-bold hover:bg-[#f5d000] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">{busy?<><Spinner sz="w-4 h-4" c="border-[#1B1B1B]"/>Adding…</>:"+ Add to Access List"}</button>
-            </form>
-            <div className="mt-3 p-3 bg-[#FFFBEA] rounded-xl border border-[#FFDD2F]/40 text-xs text-gray-600"><strong>How it works:</strong> Add email here → share the app URL → they sign up → role is auto-assigned.</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="text-sm font-bold text-[#1B1B1B]">Access List <span className="text-gray-400 font-normal">({list.length})</span></h3>
-              <p className="text-xs text-gray-400 mt-0.5">Pre-approved emails. Green dot = signed up.</p>
-            </div>
-            {list.length===0 ? <p className="text-sm text-gray-400 text-center py-10">No members added yet.</p>
-              : <div className="divide-y divide-gray-50">{list.map(a=>{ const active=roles.find(r=>r.email===a.email); return (
-                <div key={a.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors">
-                  <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-[#1B1B1B] truncate">{a.full_name||a.email}</p>{a.full_name&&<p className="text-xs text-gray-400 truncate">{a.email}</p>}</div>
-                  <div className="flex items-center gap-2.5 ml-3 flex-shrink-0"><RoleBadge role={a.role}/><div className={`w-2 h-2 rounded-full ${active?"bg-green-400":"bg-gray-200"}`}/><button onClick={()=>rm(a.id,a.email)} className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors">×</button></div>
-                </div>); })}</div>
-            }
-          </div>
-        </div>
-      );
-    };
-
-    const Dashboard = ({session,userRole}) => {
-      const {role,full_name} = userRole;
-      const uid = session.user.id;
-      const [opps,setOpps]     = useState([]);
-      const [loading,setLoad]  = useState(true);
-      const [search,setSearch] = useState("");
-      const [fStage,setFStage] = useState("");
-      const [fSrc,setFSrc]     = useState("");
-      const [modal,setModal]   = useState(null);
-      const [nav,setNav]       = useState("opps");
-      const [sort,setSort]     = useState({field:"created_at",dir:"desc"});
-      const [delId,setDelId]   = useState(null);
-      useEffect(()=>{ dbO.load().then(d=>{ setOpps(d); setLoad(false); }).catch(()=>setLoad(false)); },[]);
-      const filtered = useMemo(()=>{
-        let r=[...opps];
-        if(search){ const q=search.toLowerCase(); r=r.filter(o=>[o.clientName,o.primaryPlatform,o.opportunityOwner,o.source].some(v=>(v||"").toLowerCase().includes(q))); }
-        if(fStage) r=r.filter(o=>o.stage===fStage);
-        if(fSrc)   r=r.filter(o=>o.source===fSrc);
-        r.sort((a,b)=>{ let va=a[sort.field]||"",vb=b[sort.field]||""; if(sort.field==="potentialMonthlyRevenue"){va=Number(va)||0;vb=Number(vb)||0;} return sort.dir==="asc"?(va>vb?1:-1):(va<vb?1:-1); });
-        return r;
-      },[opps,search,fStage,fSrc,sort]);
-      const stats = useMemo(()=>{ const active=opps.filter(o=>!["Won","Lost","On Hold"].includes(o.stage)); const won=opps.filter(o=>o.stage==="Won"); return { total:opps.length, active:active.length, pipe:active.reduce((s,o)=>s+(Number(o.potentialMonthlyRevenue)||0),0), won:won.reduce((s,o)=>s+(Number(o.potentialMonthlyRevenue)||0),0) }; },[opps]);
-      const togSort = f => setSort(s=>s.field===f?{...s,dir:s.dir==="asc"?"desc":"asc"}:{field:f,dir:"asc"});
-      const Arr = ({f}) => sort.field===f ? <span className="ml-0.5 opacity-50">{sort.dir==="asc"?"↑":"↓"}</span> : null;
-      const handleDel = async id => {
-        if(!confirm("Delete this opportunity? Cannot be undone.")) return;
-        setDelId(id);
-        try { await dbO.del(id); setOpps(p=>p.filter(o=>o.id!==id)); } catch {}
-        setDelId(null);
-      };
-      const onSaved = o => setOpps(prev=>{ const i=prev.findIndex(x=>x.id===o.id); return i>=0?prev.map(x=>x.id===o.id?o:x):[o,...prev]; });
-      const filtPipe = filtered.reduce((s,o)=>s+(Number(o.potentialMonthlyRevenue)||0),0);
-      return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
-          <header className="bg-[#1B1B1B] px-5 py-3 flex items-center justify-between sticky top-0 z-40 shadow-xl">
-            <div className="flex items-center gap-3">
-              <img src="https://www.mavlers.com/images/MavlersLogo.svg" alt="Mavlers" className="h-7 brightness-0 invert flex-shrink-0"/>
-              <div className="w-px h-5 bg-gray-600"/>
-              <span className="text-white text-sm font-bold tracking-wide hidden sm:block">Opportunity Tracker</span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <div className="text-right hidden md:block"><p className="text-white text-xs font-semibold leading-tight">{full_name||session.user.email.split("@")[0]}</p><p className="text-gray-500 text-xs">{session.user.email}</p></div>
-              <RoleBadge role={role}/>
-              <button onClick={()=>db.auth.signOut()} className="text-xs text-gray-500 hover:text-[#FFDD2F] font-medium transition-colors ml-1">Sign out</button>
-            </div>
-          </header>
-          <div className="bg-white border-b border-gray-200 px-5">
-            <div className="flex">
-              {[["opps","📊 Opportunities"],...(can.team(role)?[["team","👥 Team"]]:[])] .map(([t,l])=><button key={t} onClick={()=>setNav(t)} className={`py-3 px-4 text-xs sm:text-sm font-bold transition-all border-b-2 ${nav===t?"border-[#FFDD2F] text-[#1B1B1B]":"border-transparent text-gray-400 hover:text-gray-600"}`}>{l}</button>)}
-            </div>
-          </div>
-          {nav==="team"&&can.team(role) ? <TeamPage/> : (
-            <div className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-                <StatCard label="Total Opps"       value={stats.total}/>
-                <StatCard label="Active Pipeline"  value={stats.active} sub="excl. Won / Lost"/>
-                <StatCard label="Monthly Pipeline" value={fmtINR(stats.pipe)} hi sub="active opps"/>
-                <StatCard label="Monthly Won"      value={fmtINR(stats.won)}  sub="closed"/>
-              </div>
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 mb-4">
-                <div className="flex flex-wrap gap-2 items-center">
-                  <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Search client, platform, owner…" className="flex-1 min-w-36 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"/>
-                  <select value={fStage} onChange={e=>setFStage(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"><option value="">All Stages</option>{STAGES.map(s=><option key={s} value={s}>{s}</option>)}</select>
-                  <select value={fSrc}   onChange={e=>setFSrc(e.target.value)}   className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"><option value="">All Sources</option>{SOURCES.map(s=><option key={s} value={s}>{s}</option>)}</select>
-                  {(fStage||fSrc||search)&&<button onClick={()=>{setSearch("");setFStage("");setFSrc("");}} className="px-3 py-2 text-xs font-semibold text-gray-400 hover:text-red-500 border border-gray-200 rounded-lg transition-colors">✕ Clear</button>}
-                  <div className="flex-1"/>
-                  {can.create(role)&&<button onClick={()=>setModal({mode:"add"})} className="flex items-center gap-1.5 px-4 py-2 bg-[#FFDD2F] text-[#1B1B1B] rounded-lg text-sm font-bold hover:bg-[#f5d000] transition-colors whitespace-nowrap shadow-sm">+ Add Opportunity</button>}
-                </div>
-              </div>
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                {loading
-                  ? <div className="flex flex-col items-center justify-center p-16 gap-4"><Spinner sz="w-8 h-8"/><p className="text-sm text-gray-400">Loading opportunities…</p></div>
-                  : filtered.length===0
-                    ? <div className="text-center py-16"><div className="text-5xl mb-3">📋</div><p className="text-gray-600 font-semibold">No opportunities found</p><p className="text-gray-400 text-sm mt-1">{can.create(role)?"Click + Add Opportunity to get started.":"No entries match your filters."}</p></div>
-                    : (<>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b border-gray-100 text-xs text-gray-400 font-bold uppercase tracking-wide bg-gray-50/80">
-                                <th className="px-5 py-3 text-left cursor-pointer hover:text-[#1B1B1B] select-none" onClick={()=>togSort("clientName")}>Client<Arr f="clientName"/></th>
-                                <th className="px-4 py-3 text-left cursor-pointer hover:text-[#1B1B1B] select-none" onClick={()=>togSort("primaryPlatform")}>Platform<Arr f="primaryPlatform"/></th>
-                                <th className="px-4 py-3 text-left cursor-pointer hover:text-[#1B1B1B] select-none" onClick={()=>togSort("stage")}>Stage<Arr f="stage"/></th>
-                                <th className="px-4 py-3 text-left cursor-pointer hover:text-[#1B1B1B] select-none" onClick={()=>togSort("potentialMonthlyRevenue")}>Revenue<Arr f="potentialMonthlyRevenue"/></th>
-                                <th className="px-4 py-3 text-left hidden md:table-cell">Source</th>
-                                <th className="px-4 py-3 text-left hidden lg:table-cell">Owner</th>
-                                <th className="px-4 py-3 text-left hidden xl:table-cell cursor-pointer hover:text-[#1B1B1B] select-none" onClick={()=>togSort("created_at")}>Added<Arr f="created_at"/></th>
-                                <th className="px-4 py-3 w-24"/>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                              {filtered.map(o=>(
-                                <tr key={o.id} className="hover:bg-[#FFFEF5] transition-colors group">
-                                  <td className="px-5 py-3.5"><p className="font-bold text-[#1B1B1B] truncate max-w-[180px]">{o.clientName||<span className="text-gray-300 italic font-normal">Unnamed</span>}</p>{o.industry&&<p className="text-xs text-gray-400">{o.industry}{o.clientSize?` · ${o.clientSize}`:""}</p>}</td>
-                                  <td className="px-4 py-3.5 text-gray-600 truncate max-w-[140px]">{o.primaryPlatform||"—"}</td>
-                                  <td className="px-4 py-3.5"><StageBadge stage={o.stage||"New Lead"}/></td>
-                                  <td className="px-4 py-3.5"><span className={`font-bold ${o.potentialMonthlyRevenue?"text-[#1B1B1B]":"text-gray-300"}`}>{o.potentialMonthlyRevenue?fmtINR(Number(o.potentialMonthlyRevenue)):"—"}</span></td>
-                                  <td className="px-4 py-3.5 text-gray-500 hidden md:table-cell">{o.source||"—"}</td>
-                                  <td className="px-4 py-3.5 text-gray-500 text-xs hidden lg:table-cell truncate max-w-[120px]">{o.opportunityOwner||"—"}</td>
-                                  <td className="px-4 py-3.5 text-gray-400 text-xs hidden xl:table-cell whitespace-nowrap">{fmtDate(o.created_at)}</td>
-                                  <td className="px-4 py-3.5">
-                                    <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                                      {can.edit(role,o,uid)&&<button onClick={()=>setModal({mode:"edit",data:o})} className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-[#FFDD2F]/20 text-[#1B1B1B] hover:bg-[#FFDD2F] transition-colors">Edit</button>}
-                                      {can.del(role,o,uid)&&<button onClick={()=>handleDel(o.id)} disabled={delId===o.id} className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 transition-colors">{delId===o.id?"…":"Del"}</button>}
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between flex-wrap gap-2">
-                          <p className="text-xs text-gray-400 font-medium">Showing <strong className="text-[#1B1B1B]">{filtered.length}</strong> of <strong className="text-[#1B1B1B]">{opps.length}</strong> opportunities</p>
-                          <p className="text-xs text-gray-400 font-medium">Filtered pipeline: <strong className="text-[#1B1B1B]">{fmtINR(filtPipe)}</strong></p>
-                        </div>
-                      </>)
-                }
-              </div>
-            </div>
-          )}
-          {modal&&<OppModal editData={modal.mode==="edit"?modal.data:null} userId={uid} role={role} onClose={()=>setModal(null)} onSaved={onSaved}/>}
-        </div>
-      );
-    };
-
-    function App() {
-      const [session,setSession]   = useState(undefined);
-      const [userRole,setUserRole] = useState(null);
-      const [roleLoad,setRoleLoad] = useState(false);
-      const fetchRole = useCallback(async uid => {
-        setRoleLoad(true);
-        try { const {data}=await db.from("user_roles").select("role,full_name,email").eq("user_id",uid).single(); setUserRole(data||null); }
-        catch { setUserRole(null); }
-        setRoleLoad(false);
-      },[]);
-      useEffect(()=>{
-        db.auth.getSession().then(({data:{session:s}})=>{ setSession(s||null); if(s) fetchRole(s.user.id); });
-        const {data:{subscription}}=db.auth.onAuthStateChange((_e,s)=>{ setSession(s||null); if(s) fetchRole(s.user.id); else { setUserRole(null); } });
-        return ()=>subscription.unsubscribe();
-      },[fetchRole]);
-      if(session===undefined||roleLoad) return <LoadingScreen/>;
-      if(!session)   return <AuthPage/>;
-      if(!userRole)  return <NoAccess onOut={()=>db.auth.signOut()} email={session.user.email}/>;
-      return <Dashboard session={session} userRole={userRole}/>;
-    }
-
-    ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
-  </script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-</body>
-</html>
+           �'WGF����6Ɩ6�׶��6��6W�6�74��S�'��"�R��B&�&FW"&�&FW"�w&��#&�V�FVB׆�FW�B�6�f��B�6V֖&��BFW�B�w&��c��fW#�&r�v��FRG&�6�F����6���'2#�6�6V���'WGF�����2bbF#�bb�'WGF��G�S�&'WGF��"��6Ɩ6�ײ����6WEF"�C��B���6�74��S�'��"�R��B&�&FW"&�&FW"�w&��#&�V�FVB׆�FW�B�6�f��B�6V֖&��BFW�B�w&��c��fW#�&r�v��FRG&�6�F����6���'2#�(i&6���'WGF���Т�F�b6�74��S�&f�W��"����2bbF#���D��D%2��V�wF�����'WGF��G�S�&'WGF��"��6Ɩ6�ײ����6WEF"�C��B���6�74��S�'��"�R��R&rղ4ddDC$e�FW�Bղ3##%�&�V�FVB׆�FW�B�6�f��B�&��B��fW#�&rղ6cVC�G&�6�F����6���'2#��W�B(i#��'WGF�����'WGF��G�S�&'WGF��"��6Ɩ6�׷6fW�F�6&�VC׶'W7��6�74��S�'��"�R��R&rղ3##%�FW�Bղ4ddDC$e�&�V�FVB׆�FW�B�6�f��B�&��B��fW#�&r�&�6�F�6&�VC��6�G��cf�W��FV�2�6V�FW"v�"G&�6�F����6���'2#�'W7�����7���W"7��'r�B��B"��6f��~(
+c��㦗4VF�C�%6fR6��vW2#�$FB��'GV�G�'���'WGF���Т��F�c���F�c���F�c����Ӱ��6��7B7FvTG&�F�v������B�7W'&V�E7FvR���6V�V7B���6��6WҒ����6��7B&Vb�W6U&Vb��V���W6TVffV7B����簢6��7B��F�W"�R����b�&Vb�7W'&V�Bbb&Vb�7W'&V�B�6��F��2�R�F&vWB����6��6R���Ӱ�F�7V�V�B�FDWfV�DƗ7FV�W"�&��W6VF�v�"Ɔ�F�W"���&WGW&�����F�7V�V�B�&V��fTWfV�DƗ7FV�W"�&��W6VF�v�"Ɔ�F�W"����Ŷ��6��6Uғ��&WGW&����F�b&Vc׷&Vg�6�74��S�&'6��WFR��SF��gV���VgB��B�&r�v��FR&�V�FVB׆�&�&FW"&�&FW"�w&��#6�F�r׆���֖��rճc��#��6�74��S�'��2���RFW�Bׇ2f��B�&��BFW�B�w&��CWW&66RG&6���r�v�FW"&�&FW"�"&�&FW"�w&���"�#�6��vR7FvS����5DtU2���3��6��7B��5DtU��UD�5Ӳ6��7B7F�fS�3���7W'&V�E7FvS�&WGW&����'WGF���W�׷7���6Ɩ6�ײ������6V�V7B�2��6�74��S׶r�gV��FW�B��VgB��2���RFW�Bׇ2f��B�6V֖&��Bf�W��FV�2�6V�FW"v�"G&�6�F����6���'2G�7F�fS�&&rղ4ddd$T�FW�Bղ3##%�#�'FW�B�w&��c��fW#�&r�w&��S'����7�6�74��S׶r�"��"&�V�FVB�gV��f�W��6�&���G���F�G�����7Т�7F�fRbb�7�6�74��S�&���WF�FW�Bղ4ddDC$e�#�)�3��7��Т��'WGF�����җТ��F�c����Ӱ��6��7BFV�vR�������6��7B�Ɨ7B�6WDƗ7E��W6U7FFR��ғ��6��7B�&��W2�6WE&��W5��W6U7FFR��ғ��6��7B���F��r�6WD��F��u��W6U7FFR�G'VR���6��7B�f�&��6WDf�&���W6U7FFR��V��â""�&��S�'6�W2"�gV�����S�"'ғ��6��7B�'W7��6WD'W7���W6U7FFR�f�6R���6��7B�W'"�6WDW'%��W6U7FFR�""���6��7B����6WD����W6U7FFR�""���W6TVffV7B�����&�֗6R���F%B�Ɨ7B���F%B�&��W2��Ғ�F�V₅���%ғ��6WDƗ7B��6WE&��W2�"��Ғ�6F6������Ғ�f���ǒ�����6WD��F��r�f�6R����ŵғ��6��7BFB�7��2R����R�&WfV�DFVfV�B���6WD'W7��G'VR��6WDW'"�""��6WD���""���G'��v�BF%B�FB�f�&��V����F���vW$66R���G&�҂��f�&��&��R�f�&��gV�����R�G&�҂���6��7B��v�BF%B�Ɨ7B���6WDƗ7B��6WD���G�f�&��V����FFVB2G�f�&��&��W��6�&RF�RU$�6�F�W�6�6�v�W���6WDf�&҇�V��â""�&��S�'6�W2"�gV�����S�"'ғ�Т6F6��W"��6WDW'"�W"��W76vW��$f��VB�"��Т6WD'W7��f�6R���Ӱ�6��7B&��7��2��B�V�������b�6��f�&҆&V��fRG�V�������&WGW&㰢G'��v�BF%B�&V��fR��B��6WDƗ7B������f��FW"����B�֖B����6F6��W"��6WDW'"�W"��W76vR��ТӰ��b���F��r�&WGW&��F�b6�74��S�&f�W��W7F�g��6V�FW"�"#��7���W"����F�c㰢&WGW&����F�b6�74��S�&���r�'��ׂ�WF��B6ӧ�b76Rג�R#��F�b6�74��S�&&r�v��FR&�V�FVB�'��&�&FW"&�&FW"�w&��6�F�r�6��R#�ƃ26�74��S�'FW�B�6�f��B�&��BFW�Bղ3##%��"�B#��f�FRFV��V�&W#���3��f�&���7V&֗C׶FG�6�74��S�'76Rג�2#��F�b6�74��S�&w&�Bw&�B�6��2�"v�2#��F�c��d�&V��gV����S��d�&V���d��WBf�VS׶f�&��gV�����W���6��vS׶S��6WDf�&҇�⇲����gV�����S�R�F&vWB�f�VWҒ���6V���FW#�$�F6�&�"����F�c��F�c��d�&V�&W�&��S��d�&V���6V�V7Bf�VS׶f�&��&��W���6��vS׶S��6WDf�&҇�⇲����&��S�R�F&vWB�f�VWҒ��6�74��S׶G��6�7�&r�v��FV����F���f�VS�'6�W2#�6�W3���F������F���f�VS�&w&�wF�#�w&�wF����F������F���f�VS�&�2#��3���F������F���f�VS�&F֖�#�F֖����F������6V�V7C���F�c���F�c��F�c��d�&V�&W�v�&�V�����d�&V���d��WBG�S�&V���"f�VS׶f�&��V������6��vS׶S��6WDf�&҇�⇲����V��æR�F&vWB�f�VWҒ���6V���FW#�&��T�f�W'2�6��"&WV�&VB����F�c��W'"bb�6�74��S�'FW�Bׇ2FW�B�&VB�c&r�&VB�S&�V�FVB��r��2��"#�W''����Т���bb�6�74��S�'FW�Bׇ2FW�B�w&VV��s&r�w&VV��S&�V�FVB��r��2��"#�������Т�'WGF��G�S�'7V&֗B"F�6&�VC׶'W7��6�74��S�'r�gV����"�R&rղ4ddDC$e�FW�Bղ3##%�&�V�FVB׆�FW�B�6�f��B�&��B��fW#�&rղ6cVC�F�6&�VC��6�G��cf�W��FV�2�6V�FW"�W7F�g��6V�FW"v�"G&�6�F����6���'2#�'W7�����7���W"7��'r�B��B"3�&&�&FW"ղ3##%�"��FF��~(
+c���"�FBF�66W72Ɨ7B'���'WGF�����f�&���F�b6�74��S�&�B�2�2&rղ4ddd$T�&�V�FVB׆�&�&FW"&�&FW"ղ4ddDC$e��CFW�Bׇ2FW�B�w&��c#��7G&��s��r�Bv�&�3���7G&��s�FBV����W&R(i"6�&RF�RU$�(i"F�W�6�v�W(i"&��R�2WF��76�v�VB���F�c���F�c��F�b6�74��S�&&r�v��FR&�V�FVB�'��&�&FW"&�&FW"�w&��6�F�r�6��fW&f��rֆ�FFV�#��F�b6�74��S�'��R��B&�&FW"�"&�&FW"�w&��#�ƃ26�74��S�'FW�B�6�f��B�&��BFW�Bղ3##%�#�66W72Ɨ7B�7�6�74��S�'FW�B�w&��Cf��B���&��#⇶Ɨ7B��V�wF�ғ��7�����3��6�74��S�'FW�Bׇ2FW�B�w&��C�B��R#�&R�&�fVBV���2�w&VV�F�B�6�v�VBW������F�c��Ɨ7B��V�wF������6�74��S�'FW�B�6�FW�B�w&��CFW�B�6V�FW"��#����V�&W'2FFVB�WB������F�b6�74��S�&F�f�FRגF�f�FR�w&��S#�Ɨ7B�����6��7B7F�fS�&��W2�f��B�#��"�V�������V���&WGW&����F�b�W�׶�G�6�74��S�&f�W��FV�2�6V�FW"�W7F�g��&WGvVV���R��2�R��fW#�&r�w&��SG&�6�F����6���'2#��F�b6�74��S�&֖��r�f�W��#��6�74��S�'FW�B�6�f��B�6V֖&��BFW�Bղ3##%�G'V�6FR#��gV�����W���V��������gV�����Rbc�6�74��S�'FW�Bׇ2FW�B�w&��CG'V�6FR#��V����������F�c��F�b6�74��S�&f�W��FV�2�6V�FW"v�"�R���2f�W��6�&���#��&��T&FvR&��S׶�&��W����F�b6�74��S׶r�"��"&�V�FVB�gV��G�7F�fS�&&r�w&VV��C#�&&r�w&��#'�����'WGF����6Ɩ6�ײ����&҆�B��V���6�74��S�'FW�B�w&��3��fW#�FW�B�&VB�CFW�B׆��VF��r����RG&�6�F����6���'2#�9s��'WGF�����F�c���F�c⓲җ���F�c�Т��F�c���F�c����Ӱ��6��7BF6�&�&B���6W76����W6W%&��WҒ����6��7B�&��R�gV�����W��W6W%&��S��6��7BV�B�6W76����W6W"�C��6��7B��2�6WD�5��W6U7FFR��ғ��6��7B���F��r�6WD��E��W6U7FFR�G'VR���6��7B�6V&6��6WE6V&6���W6U7FFR�""���6��7B�e7FvR�6WDe7FvU��W6U7FFR�""���6��7B�e7&2�6WDe7&5��W6U7FFR�""���6��7B���F��6WD��F���W6U7FFR��V���6��7B��b�6WD�e��W6U7FFR�&�2"���6��7B�6�'B�6WE6�'E��W6U7FFR��f�V�C�&7&VFVE�B"�F�#�&FW62'ғ��6��7B�FVĖB�6WDFVĖE��W6U7FFR��V���6��7B�7FvU�W�6WE7FvU�W��W6U7FFR��V���6��7B�7FvT'W7��6WE7FvT'W7���W6U7FFR��V���W6TVffV7B�����F$����B���F�V�C��6WD�2�B��6WD��B�f�6R��Ғ�6F6������6WD��B�f�6R����ŵғ��6��7Bf��FW&VB�W6T�V�򂂓�簢�WB#ղ����5Ӱ��b�6V&6���6��7B�6V&6��F���vW$66R���#�"�f��FW"������6ƖV�D��R���&��'��Ff�&��������Ff�&�7�ŵҒ�����'GV�G��v�W"���6�W&6U��6��R�c��g��""��F���vW$66R����6�VFW2�����Т�b�e7FvR�#�"�f��FW"������7FvS���e7FvR����b�e7&2�#�"�f��FW"������6�W&6S���e7&2���"�6�'B���"����WBf��6�'B�f�V�E���""�f#�%�6�'B�f�V�E���"#��b�6�'B�f�V�C���'�FV�F�����F�Ǖ&WfV�VR"��f��V�&W"�f����f#��V�&W"�f"�����&WGW&�6�'B�F�#���&62#�f�f#������f�f#�����ғ��&WGW&�#���Ŷ�2�6V&6��e7FvR�e7&2�6�'Eғ��6��7B7FG2�W6T�V�򂂓��6��7B7F�fS��2�f��FW"�����%v��"�$��7B"�$�����B%���6�VFW2���7FvR���6��7Bv����2�f��FW"������7FvS���%v��"��&WGW&��F�Fæ�2��V�wF��7F�fS�7F�fR��V�wF���S�7F�fR�&VGV6R��2����2���V�&W"����FV�F�����F�Ǖ&WfV�VR�������v��v���&VGV6R��2����2���V�&W"����FV�F�����F�Ǖ&WfV�VR������Ӳ�Ŷ�5ғ��6��7BF�u6�'B�b��6WE6�'B�3��2�f�V�C���c�����2�F�#�2�F�#���&62#�&FW62#�&62'ӧ�f�V�C�b�F�#�&62'ғ��6��7B'"���gҒ��6�'B�f�V�C���b��7�6�74��S�&����R�6�G��S#�6�'B�F�#���&62#�.(i#�.(i2'���7����V�ð�6��7B��F�TFV��7��2�B�����b�6��f�&҂$FV�WFRF��2��'GV�G��6���B&RV�F��R�"��&WGW&㰢6WDFVĖB��B���G'��v�BF$��FV�B��6WD�2����f��FW"������B�֖B����6F6��Т6WDFVĖB��V���Ӱ�6��7B��F�U7FvT6��vR�7��2���B��Wu7FvR�����6��7B���2�f��B������C�����B����b���&WGW&㰢6WE7FvT'W7����B���6WE7FvU�W��V���G'���6��7B��B�7&VFVE�B�������G�����v�BF$��WB���B��������B�7FvS��Wu7FvR�&��'��Ff�&Ӣ����Ff�&�7�ŵҕ������&��'��Ff�&���"'ғ��6WD�2�&Wc��&Wb��������C�����C�������7FvS��Wu7FvWӦ򒓰��6F6��R��Т6WE7FvT'W7���V���Ӱ�6��7B��6fVB����6WD�2�&Wc��6��7B��&Wb�f��D��FW������C�����B��&WGW&�����&Wb�������C�����C�󧂓�������&WeӲғ��6��7Bf��E�R�f��FW&VB�&VGV6R��2����2���V�&W"����FV�F�����F�Ǖ&WfV�VR��������6��7BvWE�Ff�&�F�7��������6��7B�G2����Ff�&�2bf���Ff�&�2��V�wF�����Ff�&�2����&��'��Ff�&�����&��'��Ff�&����ғ���b��G2��V�wF��&WGW&�.(	B#���b��G2��V�wF�����&WGW&��G5�Ӱ�&WGW&�G��G5����G��G2��V�wF�����Ӱ�&WGW&����F�b6�74��S�&֖�ւ�67&VV�&r�w&��Sf�W�f�W��6��#�ƆVFW"6�74��S�&&rղ3##%���R��2f�W��FV�2�6V�FW"�W7F�g��&WGvVV�7F�6��F����C6�F�r׆�#��F�b6�74��S�&f�W��FV�2�6V�FW"v�2#�Ɩ�r7&3�&�GG3���wwr��f�W'2�6�����vW2��f�W'4��v��7fr"�C�$�f�W'2"6�74��S�&��r'&�v�F�W72���fW'Bf�W��6�&���"���F�b6�74��S�'r����R&r�w&��c"���7�6�74��S�'FW�B�v��FRFW�B�6�f��B�&��BG&6���r�v�FR��FFV�6Ӧ&��6�#���'GV�G�G&6�W#��7����F�c��F�b6�74��S�&f�W��FV�2�6V�FW"v�"�R#��F�b6�74��S�'FW�B�&�v�B��FFV��C�&��6�#��6�74��S�'FW�B�v��FRFW�Bׇ2f��B�6V֖&��B�VF��r�F�v�B#�gV�����W��6W76����W6W"�V����7ƗB�$"��������6�74��S�'FW�B�w&��SFW�Bׇ2#�6W76����W6W"�V���������F�c��&��T&FvR&��S׷&��W����'WGF����6Ɩ6�ײ����F"�WF��6�v��WB���6�74��S�'FW�Bׇ2FW�B�w&��S��fW#�FW�Bղ4ddDC$e�f��B��VF�V�G&�6�F����6���'2���#�6�v��WC��'WGF�����F�c����VFW#��F�b6�74��S�&&r�v��FR&�&FW"�"&�&FW"�w&��#��R#��F�b6�74��S�&f�W�#����&�2"�/	�8���'GV�F�W2%�����6��FV҇&��R����'FV�"�/	�RFV�%�ӥ�ҕ������B��ғ���'WGF���W�׷G���6Ɩ6�ײ����6WD�b�B��6�74��S׶��2��BFW�Bׇ26ӧFW�B�6�f��B�&��BG&�6�F������&�&FW"�"�"G��c���C�&&�&FW"ղ4ddDC$e�FW�Bղ3##%�#�&&�&FW"�G&�7&V�BFW�B�w&��C��fW#�FW�B�w&��c'�������'WGF���Т��F�c���F�c���c���'FV�"bf6��FV҇&��R���FV�vR������F�b6�74��S�&f�W���B6ӧ�b���r�w��ׂ�WF�r�gV��#��F�b6�74��S�&w&�Bw&�B�6��2�"�s�w&�B�6��2�Bv�2�"�R#��7FD6&B�&V��%F�F��2"f�VS׷7FG2�F�F�����7FD6&B�&V��$7F�fR�VƖ�R"f�VS׷7FG2�7F�fW�7V#�&W�6��v�����7B"���7FD6&B�&V��$���F�ǒ�VƖ�R"f�VS׶f�D��"�7FG2��R����7V#�&7F�fR�2"���7FD6&B�&V��$���F�ǒv��"f�VS׶f�D��"�7FG2�v���7V#�&6��6VB"����F�c��F�b6�74��S�&&r�v��FR&�V�FVB׆�&�&FW"&�&FW"�w&��6�F�r�6��2�"�B#��F�b6�74��S�&f�W�f�W��w&v�"�FV�2�6V�FW"#�Ɩ�WBf�VS׷6V&6����6��vS׶S��6WE6V&6��R�F&vWB�f�VR���6V���FW#�/	�H�6V&6�6ƖV�B��Ff�&���v�W.(
+b"6�74��S�&f�W��֖��r�3b��2��"&�&FW"&�&FW"�w&��#&�V�FVB��rFW�B�6�f�7W3��WFƖ�R����Rf�7W3�&��r�"f�7W3�&��rղ4ddDC$e�"���6V�V7Bf�VS׶e7FvW���6��vS׶S��6WDe7FvR�R�F&vWB�f�VR��6�74��S�'��2��"&�&FW"&�&FW"�w&��#&�V�FVB��rFW�B�6�&r�v��FRf�7W3��WFƖ�R����Rf�7W3�&��r�"f�7W3�&��rղ4ddDC$e�#���F���f�VS�"#���7FvW3���F����5DtU2���3����F����W�׷7�f�VS׷7��7����F�������6V�V7C��6V�V7Bf�VS׶e7&7���6��vS׶S��6WDe7&2�R�F&vWB�f�VR��6�74��S�'��2��"&�&FW"&�&FW"�w&��#&�V�FVB��rFW�B�6�&r�v��FRf�7W3��WFƖ�R����Rf�7W3�&��r�"f�7W3�&��rղ4ddDC$e�#���F���f�VS�"#���6�W&6W3���F����4�U$4U2���3����F����W�׷7�f�VS׷7��7����F�������6V�V7C���e7FvW��e7&7��6V&6��bc�'WGF����6Ɩ6�ײ����6WE6V&6��""��6WDe7FvR�""��6WDe7&2�""����6�74��S�'��2��"FW�Bׇ2f��B�6V֖&��BFW�B�w&��C��fW#�FW�B�&VB�S&�&FW"&�&FW"�w&��#&�V�FVB��rG&�6�F����6���'2#�)�R6�V#��'WGF���Т�F�b6�74��S�&f�W��"���6��7&VFR�&��R�bc�'WGF����6Ɩ6�ײ����6WD��F���FS�&FB'җ�6�74��S�&f�W��FV�2�6V�FW"v��R��B��"&rղ4ddDC$e�FW�Bղ3##%�&�V�FVB��rFW�B�6�f��B�&��B��fW#�&rղ6cVC�G&�6�F����6���'2v��FW76R���w&6�F�r�6�#�FB��'GV�G���'WGF���Т��F�c���F�c��F�b6�74��S�&&r�v��FR&�V�FVB׆�&�&FW"&�&FW"�w&��6�F�r�6��fW&f��rֆ�FFV�#����F��p���F�b6�74��S�&f�W�f�W��6���FV�2�6V�FW"�W7F�g��6V�FW"�bv�B#��7���W"7��'rӂ�ӂ"���6�74��S�'FW�B�6�FW�B�w&��C#���F��r��'GV�F�W>(
+c�����F�c��f��FW&VB��V�wF���� ���F�b6�74��S�'FW�B�6V�FW"��b#��F�b6�74��S�'FW�B�W���"�2#�	�8���F�c��6�74��S�'FW�B�w&��cf��B�6V֖&��B#�����'GV�F�W2f�V�C����6�74��S�'FW�B�w&��CFW�B�6��B�#�6��7&VFR�&��R��$6Ɩ6��FB��'GV�G�F�vWB7F'FVB�#�$��V�G&�W2�F6���W"f��FW'2�'������F�c������F�b6�74��S�&�fW&f��rׂ�WF�#��F&�R6�74��S�'r�gV��FW�B�6�#��F�VC��G"6�74��S�&&�&FW"�"&�&FW"�w&��FW�Bׇ2FW�B�w&��Cf��B�&��BWW&66RG&6���r�v�FR&r�w&��S�#��F�6�74��S�'��R��2FW�B��VgB7W'6�"����FW"��fW#�FW�Bղ3##%�6V�V7B����R"��6Ɩ6�ײ����F�u6�'B�&6ƖV�D��R"���6ƖV�C�'"c�&6ƖV�D��R"����F���F�6�74��S�'��B��2FW�B��VgB7W'6�"����FW"��fW#�FW�Bղ3##%�6V�V7B����R"��6Ɩ6�ײ����F�u6�'B�'&��'��Ff�&�"����Ff�&��'"c�'&��'��Ff�&�"����F���F�6�74��S�'��B��2FW�B��VgB7W'6�"����FW"��fW#�FW�Bղ3##%�6V�V7B����R"��6Ɩ6�ײ����F�u6�'B�'7FvR"���7FvS�'"c�'7FvR"����F���F�6�74��S�'��B��2FW�B��VgB7W'6�"����FW"��fW#�FW�Bղ3##%�6V�V7B����R"��6Ɩ6�ײ����F�u6�'B�'�FV�F�����F�Ǖ&WfV�VR"���&WfV�VS�'"c�'�FV�F�����F�Ǖ&WfV�VR"����F���F�6�74��S�'��B��2FW�B��VgB��FFV��C�F&�R�6V��#�6�W&6S��F���F�6�74��S�'��B��2FW�B��VgB��FFV��s�F&�R�6V��#��v�W#��F���F�6�74��S�'��B��2FW�B��VgB��FFV��çF&�R�6V��7W'6�"����FW"��fW#�FW�Bղ3##%�6V�V7B����R"��6Ɩ6�ײ����F�u6�'B�&7&VFVE�B"���FFVC�'"c�&7&VFVE�B"����F���F�6�74��S�'��B��2r�#B"����G#���F�VC��F&�G�6�74��S�&F�f�FRגF�f�FR�w&��S#��f��FW&VB�����•�G"�W�׶��G�6�74��S�&��fW#�&rղ4dddTcU�G&�6�F����6���'2w&�W#��FB6�74��S�'��R��2�R#��6�74��S�&f��B�&��BFW�Bղ3##%�G'V�6FR���rճ���#���6ƖV�D��W���7�6�74��S�'FW�B�w&��3�FƖ2f��B���&��#�V���VC��7���������GW7G'�bc�6�74��S�'FW�Bׇ2FW�B�w&��C#����GW7G'�׶��6ƖV�E6��S�+rG���6ƖV�E6��W��"'�������FC��FB6�74��S�'��B��2�RFW�B�w&��cG'V�6FR���rճC��#�vWE�Ff�&�F�7�������FC��FB6�74��S�'��B��2�R&V�F�fR#��7FvT'W7������@���7���W"7��'r�B��B"3�&&�&FW"�w&��C"����F�b6�74��S�'&V�F�fR��Ɩ�R�&��6�#��'WGF����6Ɩ6�ײ����6��VF�B�&��R���V�B��6WE7FvU�W�7FvU�W�����C��V�æ��B���V��ТF�F�S׶6��VF�B�&��R���V�B��$6Ɩ6�F�6��vR7FvR#�V�FVf��VGТ6�74��S׶G�6��VF�B�&��R���V�B��&7W'6�"����FW"��fW#��6�G�Ӄ#�&7W'6�"�FVfV�B'�G&�6�F�����6�G�Т��7FvT&FvR7FvS׶��7FvW��$�Wr�VB'�����'WGF����7FvU�W�����Bbb���7FvTG&�F�v���C׶��GТ7W'&V�E7FvS׶��7FvW��$�Wr�VB'Т��6V�V7C׷3���F�U7FvT6��vR���B�2�Т��6��6Sײ����6WE7FvU�W��V�Т���Т��F�c�Т��FC��FB6�74��S�'��B��2�R#��7�6�74��S׶f��B�&��BG����FV�F�����F�Ǖ&WfV�VS�'FW�Bղ3##%�#�'FW�B�w&��3'������FV�F�����F�Ǖ&WfV�VS�f�D��"��V�&W"����FV�F�����F�Ǖ&WfV�VR���.(	B'���7����FC��FB6�74��S�'��B��2�RFW�B�w&��S��FFV��C�F&�R�6V��#���6�W&6W��.(	B'���FC��FB6�74��S�'��B��2�RFW�B�w&��SFW�Bׇ2��FFV��s�F&�R�6V��G'V�6FR���rճ#��#�����'GV�G��v�W'��.(	B'���FC��FB6�74��S�'��B��2�RFW�B�w&��CFW�Bׇ2��FFV��çF&�R�6V��v��FW76R���w&#�f�DFFR���7&VFVE�B����FC��FB6�74��S�'��B��2�R#��F�b6�74��S�&f�W�v��W7F�g��V�B�6�G��w&�Wֆ�fW#��6�G��G&�6�F�����6�G�#��6��VF�B�&��R���V�B�bc�'WGF����6Ɩ6�ײ����6WD��F���FS�&VF�B"�FF��җ�6�74��S�'��"�R���RFW�Bׇ2f��B�&��B&�V�FVB��r&rղ4ddDC$e��#FW�Bղ3##%���fW#�&rղ4ddDC$e�G&�6�F����6���'2#�VF�C��'WGF���Т�6��FV&��R���V�B�bc�'WGF����6Ɩ6�ײ�����F�TFV��B��F�6&�VC׶FVĖC�����G�6�74��S�'��"�R���RFW�Bׇ2f��B�&��B&�V�FVB��r&r�w&��FW�B�w&��S��fW#�&r�&VB�S��fW#�FW�B�&VB�cF�6&�VC��6�G��SG&�6�F����6���'2#�FVĖC�����C�.(
+b#�$FV�'���'WGF���Т��F�c���FC���G#���Т��F&�G����F&�S���F�c��F�b6�74��S�'��R��2&�&FW"�B&�&FW"�w&��&r�w&��S�Sf�W��FV�2�6V�FW"�W7F�g��&WGvVV�f�W��w&v�"#��6�74��S�'FW�Bׇ2FW�B�w&��Cf��B��VF�V�#�6��v��r�7G&��r6�74��S�'FW�Bղ3##%�#�f��FW&VB��V�wF����7G&��s��b�7G&��r6�74��S�'FW�Bղ3##%�#��2��V�wF����7G&��s���'GV�F�W3����6�74��S�'FW�Bׇ2FW�B�w&��Cf��B��VF�V�#�f��FW&VB�VƖ�S��7G&��r6�74��S�'FW�Bղ3##%�#�f�D��"�f��E�R����7G&��s������F�c���␢Т��F�c���F�c��Т���F�bc����F�VF�DFF׶��F����FS���&VF�B#���F��FF��V���W6W$�C׷V�G�&��S׷&��W���6��6Sײ����6WD��F�V����6fVC׶��6fVG���Т��F�c����Ӱ��gV�7F�������6��7B�6W76����6WE6W76�����W6U7FFR�V�FVf��VB���6��7B�W6W%&��R�6WEW6W%&��U��W6U7FFR��V���6��7B�&��T��B�6WE&��T��E��W6U7FFR�f�6R���6��7BfWF6�&��R�W6T6��&6��7��2V�B����6WE&��T��B�G'VR���G'��6��7B�FF��v�BF"�g&�҂'W6W%�&��W2"��6V�V7B�'&��R�gV�����R�V���"��W�'W6W%��B"�V�B��6��v�R���6WEW6W%&��R�FF���V��Т6F6��6WEW6W%&��R��V��Т6WE&��T��B�f�6R����ŵғ��W6TVffV7B����簢F"�WF��vWE6W76��ₒ�F�V₇�FF��6W76���7�ғ��6WE6W76���7���V���b�2�fWF6�&��R�2�W6W"�B��ғ��6��7B�FF��7V'67&�F������F"�WF����WF�7FFT6��vR���R�2���6WE6W76���7���V���b�2�fWF6�&��R�2�W6W"�B��V�6R�6WEW6W%&��R��V���ғ��&WGW&�����7V'67&�F����V�7V'67&�&R�����ŶfWF6�&��Uғ���b�6W76������V�FVf��VG��&��T��B�&WGW&����F��u67&VV��㰢�b�6W76���&WGW&��WF�vR�㰢�b�W6W%&��R�&WGW&����66W72���WCײ����F"�WF��6�v��WB���V���׷6W76����W6W"�V�����㰢&WGW&��F6�&�&B6W76���׷6W76����W6W%&��S׷W6W%&��W��㰢Р�&V7DD���7&VFU&��B�F�7V�V�B�vWDV�V�V�D'��B�'&��B"���&V�FW"���⓰���67&�C��67&�B7&3�&�GG3���V��r�6���&&V��7F�F���R�&&V��֖��2#���67&�C���&�G�����F���
