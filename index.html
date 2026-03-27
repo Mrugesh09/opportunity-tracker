@@ -459,7 +459,7 @@
     const Dashboard = ({session,userRole}) => {
       const { role,full_name} = userRole;
       const uid = session.user.id;
-      const [opps,sstOpps]         = useState([]);
+      const [opps,setOpps]         = useState([]);
       const [loading,setLoad]       = useState(true);
       const [search,setSearch]      = useState("");
       const [fStage,setFStage]      = useState("");
