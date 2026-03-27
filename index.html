@@ -40,15 +40,15 @@
       "On Hold":       {bg:"bg-slate-100",   text:"text-slate-600",  dot:"bg-slate-400",  border:"border-slate-200" },
     };
     const SOURCES       = ["Inbound","Outbound","Referral","LinkedIn","Event","Partner","Other"];
-    const PLATFORMS     = ["HubSpot","Salesforce Marketing Cloud","Marketo","Pardot","Klaviyo","Braze","Iterable","ActiveCampaign","Mailchimp","Zoho CRM","Other"];
-    const ADD_TOOLS     = ["Segment","CDP","Data Warehouse","BI Tool","Analytics","Custom Dev","API Integration"];
-    const ENG_TYPES     = ["Managed Services","Professional Services","Consulting","Training","Project"];
-    const EXPERTISE     = ["Email Marketing","Marketing Automation","CRM","Analytics","Content","Paid Media","SEO","Web Dev","Martech","Strategy"];
-    const BILLING       = ["Retainer","T&M","Fixed Price"];
-    const TIMEZONES     = ["IST","AEST","GMT","EST","PST","GST"];
-    const COPY_OPTS     = ["Yes","No","Partial"];
-    const EMAIL_OPTS    = ["Yes","No","Partial"];
-    const MODAL_TABS    = ["Contact","Platform","Scope","Commercial","Pipeline"];
+    const PLATFORMS     = ["Salesforce Marketing Cloud","Braze","Marketo","HubSpot","Klaviyo","Iterable","Bloomreach","Customer.io","Other"];
+    const ADD_TOOLS     = ["Segment","Snowflake","GA4","Amplitude","Shopify","BigQuery","CDP","Figma","Litmus"];
+    const ENG_TYPES     = ["Dedicated Resource","Recurring Engagement","Project-to-Project"];
+    const EXPERTISE     = ["Consulting / Strategy","Campaign Execution","Marketing Automation","Design","Copywriting","Template Production","Data / CDP","CRM Migration"];
+    const BILLING       = ["Dedicated","Shared","Project-Based"];
+    const TIMEZONES     = ["AU","EU","US","Other"];
+    const COPY_OPTS     = ["AI-Driven","AI + Human","Highly Creative"];
+    const EMAIL_OPTS    = ["AI Generated Templates","Drag & Drop Builder","Custom HTML"];
+    const MODAL_TABS    = ["Client","Engagement","Problem","Platform","Scope","Decision","Pipeline"];
     const ROLE_META     = {
       admin:  {label:"Admin",  bg:"bg-[#1B1B1B]",   text:"text-[#FFDD2F]"},
       sales:  {label:"Sales",  bg:"bg-blue-600",     text:"text-white"    },
@@ -89,7 +89,7 @@
     const FInput = ({value,onChange,placeholder,type="text",required,disabled}) => <input type={type} value={value||""} onChange={onChange} placeholder={placeholder} required={required} disabled={disabled} className={`${iCls} ${dCls}`}/>;
     const FSel = ({value,onChange,options,placeholder,disabled}) => <select value={value||""} onChange={onChange} disabled={disabled} className={`${iCls} bg-white ${dCls}`}><option value="">{placeholder||"Select…"}</option>{options.map(o=><option key={o} value={o}>{o}</option>)}</select>;
     const FTxt = ({value,onChange,placeholder,rows=3,disabled}) => <textarea value={value||""} onChange={onChange} placeholder={placeholder} rows={rows} disabled={disabled} className={`${iCls} resize-none ${dCls}`}/>;
-    const Tog = ({options,value,onChange,disabled}) => <div className="flex flex-wrap gap-1.5">{options.map(o=><button key={o} type="button" onClick={()=>!disabled&&onChange(o)} disabled={disabled} className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${value===o?"bg-[#1B1B1B] text-[#FFDD2F] border-[#1B1B1B]":"bg-white text-gray-600 border-gray-200 hover:border-gray-400"} disabled:opacity-40`}>{o}</button>)}</div>;
+    const Tog = ({options,value,onChange,disabled}) => <div className="flex flex-wrap gap-1.5">{options.map(o=><button key={o} type="button" onClick={()=>!disabled&&onChange(o)} disabled={disabled} className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${value===o?"bg-[#1B1B1B] text-[#FFDD2F] border-[#1B1B1B]":"bg-white text-gray-600 border-gray-200 hover:border-gray-400"} disabled:opacity-40`">{o}</button>)}</div>;
     const MTog = ({options,values=[],onChange,disabled}) => <div className="flex flex-wrap gap-1.5">{options.map(o=>{ const s=values.includes(o); return <button key={o} type="button" onClick={()=>!disabled&&onChange(s?values.filter(v=>v!==o):[...values,o])} disabled={disabled} className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${s?"bg-[#FFDD2F] text-[#1B1B1B] border-[#FFDD2F]":"bg-white text-gray-600 border-gray-200 hover:border-gray-400"} disabled:opacity-40`}>{o}</button>; })}</div>;
     const FSec = ({title,children}) => <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4"><p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{title}</p>{children}</div>;
 
@@ -189,13 +189,13 @@
       </div>
     );
 
-    const blankForm = () => ({clientName:"",industry:"",clientSize:"",website:"",source:"",pocName:"",pocEmail:"",pocPhone:"",opportunityOwner:"",assignedToSales:"",opportunityCreationDate:"",primaryPlatform:"",additionalTools:[],problemStatement:"",engagementType:"",expertiseNeeded:[],scopeOfWork:"",campaignsPerMonth:"",templatesPerMonth:"",automationsRequired:"",copywritingRequirement:"",emailProductionRequirement:"",estimatedHours:"",potentialMonthlyRevenue:"",billingModel:"",clientTimezone:"",supportWindow:"",stage:"New Lead",salesNotes:"",debriefNotes:""});
+    const blankForm = () => ({clientName:"",industry:"",clientSize:"",website:"",source:"",pocName:"",pocTitle:"",pocEmail:"",pocPhone:"",opportunityOwner:"",assignedToSales:"",opportunityCreationDate:"",engagementType:"",expertiseNeeded:[],problemStatement:"",urgency:"",successDefinition:"",primaryPlatform:"",additionalTools:[],scopeOfWork:"",copywritingRequirement:"",emailProductionRequirement:"",decisionMaker:"",decisionTimeline:"",budgetRange:"",competingVendors:"",estimatedHours:"",potentialMonthlyRevenue:"",billingModel:"",clientTimezone:"",supportWindow:"",stage:"New Lead",salesNotes:"",debriefNotes:"",additionalNotes:""});
 
     const OppModal = ({editData,userId,role,onClose,onSaved}) => {
       const ops = role==="ops";
       const isEdit = !!editData;
       const [form,setForm] = useState(editData?{...editData}:blankForm());
-      const [tab,setTab]   = useState(ops?4:0);
+      const [tab,setTab]   = useState(ops?6:0);
       const [busy,setBusy] = useState(false);
       const [err,setErr]   = useState("");
       const f  = k => e => setForm(p=>({...p,[k]:e.target.value}));
@@ -211,63 +211,102 @@
         } catch(er){ setErr(er.message||"Save failed."); setBusy(false); }
       };
       const tabs = [
-        <div key="c" className="space-y-4">
+        // ── Tab 0: Client ────────────────────────────────────────────────
+        <div key="client" className="space-y-4">
           <FSec title="Client Info">
             <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2"><FLabel req={!ops}>Client / Company Name</FLabel><FInput value={form.clientName} onChange={f("clientName")} placeholder="Acme Corp" required={!ops} disabled={ops}/></div>
-              <div><FLabel>Industry</FLabel><FInput value={form.industry} onChange={f("industry")} placeholder="E-commerce" disabled={ops}/></div>
-              <div><FLabel>Size</FLabel><FSel value={form.clientSize} onChange={f("clientSize")} options={["SMB","Mid-Market","Enterprise"]} disabled={ops}/></div>
-              <div className="col-span-2"><FLabel>Website</FLabel><FInput value={form.website} onChange={f("website")} placeholder="https://" disabled={ops}/></div>
-              <div className="col-span-2"><FLabel>Source</FLabel><FSel value={form.source} onChange={f("source")} options={SOURCES} placeholder="Select source" disabled={ops}/></div>
+              <div className="col-span-2"><FLabel req={!ops}>Client / Company Name</FLabel><FInput value={form.clientName} onChange={f("clientName")} placeholder="e.g. Acme Corp" required={!ops} disabled={ops}/></div>
+              <div><FLabel>Domain / Industry</FLabel><FInput value={form.industry} onChange={f("industry")} placeholder="e.g. E-commerce, Fintech" disabled={ops}/></div>
+              <div><FLabel>Company Size</FLabel><FSel value={form.clientSize} onChange={f("clientSize")} options={["SMB","Mid-Market","Enterprise"]} disabled={ops}/></div>
+              <div><FLabel>Website</FLabel><FInput value={form.website} onChange={f("website")} placeholder="https://" disabled={ops}/></div>
+              <div><FLabel>Source</FLabel><FSel value={form.source} onChange={f("source")} options={SOURCES} placeholder="Select source" disabled={ops}/></div>
             </div>
           </FSec>
           <FSec title="Point of Contact">
             <div className="grid grid-cols-2 gap-3">
-              <div><FLabel>POC Name</FLabel><FInput value={form.pocName} onChange={f("pocName")} placeholder="Full name" disabled={ops}/></div>
-              <div><FLabel>POC Email</FLabel><FInput type="email" value={form.pocEmail} onChange={f("pocEmail")} placeholder="poc@company.com" disabled={ops}/></div>
+              <div><FLabel>POC Name</FLabel><FInput value={form.pocName} onChange={f("pocName")} placeholder="e.g. Jane Doe" disabled={ops}/></div>
+              <div><FLabel>POC Title</FLabel><FInput value={form.pocTitle} onChange={f("pocTitle")} placeholder="e.g. Head of Marketing" disabled={ops}/></div>
+              <div><FLabel>POC Email</FLabel><FInput type="email" value={form.pocEmail} onChange={f("pocEmail")} placeholder="jane@company.com" disabled={ops}/></div>
               <div><FLabel>POC Phone</FLabel><FInput value={form.pocPhone} onChange={f("pocPhone")} placeholder="+91 …" disabled={ops}/></div>
-              <div><FLabel>Opp Owner (CSM)</FLabel><FInput value={form.opportunityOwner} onChange={f("opportunityOwner")} placeholder="Ravi (CSM)" disabled={ops}/></div>
-              <div><FLabel>Assigned Sales</FLabel><FInput value={form.assignedToSales} onChange={f("assignedToSales")} placeholder="Anita (Sales)" disabled={ops}/></div>
+              <div><FLabel>Opportunity Owner (CSM)</FLabel><FInput value={form.opportunityOwner} onChange={f("opportunityOwner")} placeholder="e.g. Rahul Mehta" disabled={ops}/></div>
+              <div><FLabel>Assigned Sales</FLabel><FInput value={form.assignedToSales} onChange={f("assignedToSales")} placeholder="e.g. Anita Sharma" disabled={ops}/></div>
               <div><FLabel>Created Date</FLabel><FInput type="date" value={form.opportunityCreationDate} onChange={f("opportunityCreationDate")} disabled={ops}/></div>
             </div>
           </FSec>
         </div>,
-        <div key="p" className="space-y-4">
+        // ── Tab 1: Engagement ────────────────────────────────────────────
+        <div key="eng" className="space-y-4">
+          <FSec title="Engagement Type">
+            <p className="text-xs text-gray-400 mb-3">Select ONE — how this engagement will be structured.</p>
+            <Tog options={ENG_TYPES} value={form.engagementType} onChange={fv("engagementType")} disabled={ops}/>
+          </FSec>
+          <FSec title="Expertise Needed">
+            <p className="text-xs text-gray-400 mb-3">Select ALL that apply — determines which teams are involved.</p>
+            <MTog options={EXPERTISE} values={form.expertiseNeeded} onChange={fv("expertiseNeeded")} disabled={ops}/>
+          </FSec>
+        </div>,
+        // ── Tab 2: Problem ───────────────────────────────────────────────
+        <div key="prob" className="space-y-4">
+          <FSec title="Problem Statement">
+            <p className="text-xs text-gray-400 mb-3">Answer all three — this should be compelling enough for an internal pitch.</p>
+            <div className="space-y-3">
+              <div><FLabel>What challenge or gap is the client trying to solve?</FLabel><FTxt value={form.problemStatement} onChange={f("problemStatement")} rows={3} placeholder="e.g. Client has no in-house expertise to manage Braze campaigns and is missing key lifecycle triggers." disabled={ops}/></div>
+              <div><FLabel>Why is this a priority right now? (Urgency / trigger)</FLabel><FTxt value={form.urgency} onChange={f("urgency")} rows={3} placeholder="e.g. They are migrating from Mailchimp to Braze and need to go live within 60 days." disabled={ops}/></div>
+              <div><FLabel>What does success look like to the client?</FLabel><FTxt value={form.successDefinition} onChange={f("successDefinition")} rows={3} placeholder="e.g. Fully configured Braze instance with 3 onboarding flows and ongoing campaign execution support." disabled={ops}/></div>
+            </div>
+          </FSec>
+        </div>,
+        // ── Tab 3: Platform ──────────────────────────────────────────────
+        <div key="plat" className="space-y-4">
           <FSec title="Platform & Technology">
-            <div className="mb-3"><FLabel>Primary CRM / MAP</FLabel><FSel value={form.primaryPlatform} onChange={f("primaryPlatform")} options={PLATFORMS} placeholder="Select platform" disabled={ops}/></div>
-            <div><FLabel>Additional Tools</FLabel><MTog options={ADD_TOOLS} values={form.additionalTools} onChange={fv("additionalTools")} disabled={ops}/></div>
-          </FSec>
-          <FSec title="Problem Statement"><FTxt value={form.problemStatement} onChange={f("problemStatement")} rows={4} placeholder={"What the client needs\nWhy they need it\nExpected outcome"} disabled={ops}/></FSec>
-        </div>,
-        <div key="s" className="space-y-4">
-          <FSec title="Engagement">
-            <div className="mb-3"><FLabel>Engagement Type</FLabel><Tog options={ENG_TYPES} value={form.engagementType} onChange={fv("engagementType")} disabled={ops}/></div>
-            <div><FLabel>Expertise Needed</FLabel><MTog options={EXPERTISE} values={form.expertiseNeeded} onChange={fv("expertiseNeeded")} disabled={ops}/></div>
-          </FSec>
-          <FSec title="Scope of Work"><FTxt value={form.scopeOfWork} onChange={f("scopeOfWork")} placeholder="Deliverables, responsibilities, timeline…" rows={3} disabled={ops}/></FSec>
-          <FSec title="Volume & Production">
-            <div className="grid grid-cols-3 gap-3 mb-3">
-              <div><FLabel>Campaigns/Mo</FLabel><FInput type="number" value={form.campaignsPerMonth} onChange={f("campaignsPerMonth")} placeholder="8" disabled={ops}/></div>
-              <div><FLabel>Templates/Mo</FLabel><FInput type="number" value={form.templatesPerMonth} onChange={f("templatesPerMonth")} placeholder="12" disabled={ops}/></div>
-              <div><FLabel>Automations</FLabel><FInput type="number" value={form.automationsRequired} onChange={f("automationsRequired")} placeholder="5" disabled={ops}/></div>
+            <div className="mb-3">
+              <FLabel>Primary CRM / Marketing Platform</FLabel>
+              <p className="text-xs text-gray-400 mb-2">Select the platform that will be the main focus of the engagement.</p>
+              <FSel value={form.primaryPlatform} onChange={f("primaryPlatform")} options={PLATFORMS} placeholder="Select platform" disabled={ops}/>
             </div>
-            <div className="mb-3"><FLabel>Copywriting</FLabel><Tog options={COPY_OPTS} value={form.copywritingRequirement} onChange={fv("copywritingRequirement")} disabled={ops}/></div>
-            <div><FLabel>Email Production</FLabel><Tog options={EMAIL_OPTS} value={form.emailProductionRequirement} onChange={fv("emailProductionRequirement")} disabled={ops}/></div>
+            <div>
+              <FLabel>Additional Tools / Integrations</FLabel>
+              <p className="text-xs text-gray-400 mb-2">Select all connected tools in their stack.</p>
+              <MTog options={ADD_TOOLS} values={form.additionalTools} onChange={fv("additionalTools")} disabled={ops}/>
+            </div>
           </FSec>
         </div>,
-        <div key="com" className="space-y-4">
-          <FSec title="Revenue & Billing">
+        // ── Tab 4: Scope ─────────────────────────────────────────────────
+        <div key="scope" className="space-y-4">
+          <FSec title="Scope of Work">
+            <FTxt value={form.scopeOfWork} onChange={f("scopeOfWork")} placeholder="List what Mavlers will own vs. what the client handles. Be specific about expected deliverables and outputs." rows={4} disabled={ops}/>
+          </FSec>
+          <FSec title="Copywriting Requirement">
+            <p className="text-xs text-gray-400 mb-3">Complete only if copywriting is in scope. Select ONE.</p>
+            <Tog options={COPY_OPTS} value={form.copywritingRequirement} onChange={fv("copywritingRequirement")} disabled={ops}/>
+            <p className="text-xs text-gray-400 mt-2">AI-Driven = fastest, high volume · AI + Human = balanced · Highly Creative = full human-led</p>
+          </FSec>
+          <FSec title="Email Production Requirement">
+            <p className="text-xs text-gray-400 mb-3">Complete only if email/template production is in scope. Select ONE.</p>
+            <Tog options={EMAIL_OPTS} value={form.emailProductionRequirement} onChange={fv("emailProductionRequirement")} disabled={ops}/>
+          </FSec>
+        </div>,
+        // ── Tab 5: Decision ──────────────────────────────────────────────
+        <div key="dec" className="space-y-4">
+          <FSec title="Decision & Qualification">
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div><FLabel>Est. Hours/Month</FLabel><FInput type="number" value={form.estimatedHours} onChange={f("estimatedHours")} placeholder="80" disabled={ops}/></div>
-              <div><FLabel>Monthly Revenue (₹)</FLabel><FInput type="number" value={form.potentialMonthlyRevenue} onChange={f("potentialMonthlyRevenue")} placeholder="120000" disabled={ops}/></div>
+              <div><FLabel>Decision Maker (Name & Title)</FLabel><FInput value={form.decisionMaker} onChange={f("decisionMaker")} placeholder="e.g. John Smith, VP Marketing" disabled={ops}/></div>
+              <div><FLabel>Expected Decision Timeline</FLabel><FInput value={form.decisionTimeline} onChange={f("decisionTimeline")} placeholder="e.g. Within 2 weeks, End of Q2" disabled={ops}/></div>
+              <div className="col-span-2"><FLabel>Budget Range (if shared)</FLabel><FInput value={form.budgetRange} onChange={f("budgetRange")} placeholder="e.g. ₹5–8L / month, or $10K–15K / month" disabled={ops}/></div>
             </div>
-            <div><FLabel>Billing Model</FLabel><Tog options={BILLING} value={form.billingModel} onChange={fv("billingModel")} disabled={ops}/></div>
+            <div><FLabel>Competing Solutions / Vendors Being Considered</FLabel><FTxt value={form.competingVendors} onChange={f("competingVendors")} rows={3} placeholder="e.g. Client is also evaluating Accenture and an in-house hire. Note any context that affects our positioning." disabled={ops}/></div>
           </FSec>
-          <FSec title="Timezone & Support">
+          <FSec title="Commercial Details">
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div><FLabel>Est. Hours / Month</FLabel><FInput type="number" value={form.estimatedHours} onChange={f("estimatedHours")} placeholder="e.g. 80" disabled={ops}/></div>
+              <div><FLabel>Potential Monthly Revenue (₹)</FLabel><FInput type="number" value={form.potentialMonthlyRevenue} onChange={f("potentialMonthlyRevenue")} placeholder="e.g. 120000" disabled={ops}/></div>
+            </div>
+            <div className="mb-3"><FLabel>Billing Model</FLabel><Tog options={BILLING} value={form.billingModel} onChange={fv("billingModel")} disabled={ops}/></div>
             <div className="mb-3"><FLabel>Client Timezone</FLabel><Tog options={TIMEZONES} value={form.clientTimezone} onChange={fv("clientTimezone")} disabled={ops}/></div>
-            <div><FLabel>Support Window</FLabel><FInput value={form.supportWindow} onChange={f("supportWindow")} placeholder="9 AM – 5 PM AEST" disabled={ops}/></div>
+            <div><FLabel>Support Window</FLabel><FInput value={form.supportWindow} onChange={f("supportWindow")} placeholder="e.g. 9 AM – 5 PM AEST, Mon–Fri" disabled={ops}/></div>
           </FSec>
         </div>,
+        // ── Tab 6: Pipeline ──────────────────────────────────────────────
         <div key="pip" className="space-y-4">
           <FSec title="Pipeline Stage">
             <div className="grid grid-cols-2 gap-2">
@@ -276,8 +315,9 @@
           </FSec>
           <FSec title="Notes">
             <div className="space-y-3">
-              <div><FLabel>Sales Notes</FLabel><FTxt value={form.salesNotes} onChange={f("salesNotes")} placeholder="Notes for the Sales team…" rows={3}/></div>
-              <div><FLabel>Ops Debrief Notes</FLabel><FTxt value={form.debriefNotes} onChange={f("debriefNotes")} placeholder="Post-closure debrief for Ops…" rows={3}/></div>
+              <div><FLabel>Sales Notes</FLabel><FTxt value={form.salesNotes} onChange={f("salesNotes")} placeholder="Context and next steps for the Sales team…" rows={3}/></div>
+              <div><FLabel>Ops Debrief Notes</FLabel><FTxt value={form.debriefNotes} onChange={f("debriefNotes")} placeholder="Post-closure debrief for the Ops team…" rows={3}/></div>
+              <div><FLabel>Additional Notes</FLabel><FTxt value={form.additionalNotes} onChange={f("additionalNotes")} placeholder="Any other context, constraints, client preferences, or internal flags…" rows={3}/></div>
             </div>
           </FSec>
         </div>,
@@ -502,7 +542,7 @@
       },[]);
       useEffect(()=>{
         db.auth.getSession().then(({data:{session:s}})=>{ setSession(s||null); if(s) fetchRole(s.user.id); });
-        const {data:{asubscription}}=db.auth.onAuthStateChange((_e,s)=>{ setSession(s||null); if(s) fetchRole(s.user.id); else { setUserRole(null); } });
+        const {data:{subscription}}=db.auth.onAuthStateChange((_e,s)=>{ setSession(s||null); if(s) fetchRole(s.user.id); else { setUserRole(null); } });
         return ()=>subscription.unsubscribe();
       },[fetchRole]);
       if(session===undefined||roleLoad) return <LoadingScreen/>;
