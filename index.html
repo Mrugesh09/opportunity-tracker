@@ -70,7 +70,7 @@
     const dbT = {
       roles:  ()           => db.from("user_roles").select("*").order("created_at").then(({data,error})=>{ if(error) throw error; return data; }),
       list:   ()           => db.from("role_allowlist").select("*").order("created_at").then(({data,error})=>{ if(error) throw error; return data; }),
-      add:    (e,r,n)      => db.from("role_allowlist").insert({email:e,role:r,full_name:n}).then(({error})=>{ if(error) throw error; }),
+      add:    (e,r,n)      => db.from("role_allowlist").upsert({email:e,role:r,full_name:n},{onConflict:"email"}).then(({error})=>{ if(error) throw error; }),
       remove: (id)         => db.from("role_allowlist").delete().eq("id",id).then(({error})=>{ if(error) throw error; }),
     };
 
@@ -633,21 +633,6 @@
       },[]);
       useEffect(()=>{
         db.auth.getSession().then(({data:{session:s}})=>{ setSession(s||null); if(s) fetchRole(s.user.id); });
-        const {data:{subscription}}=db.auth.onAuthStateChange((_e,s)=>{ setSession(s||null); if(s) fetchRole(s.user.id); else { setUserRole(null); } });
-        return ()=>subscription.unsubscribe();
-      },[fetchRole]);
-      if(session===undefined||roleLoad) return <LoadingScreen/>;
-      if(!session)   return <AuthPage/>;
-      if(!userRole)  return <NoAccess onOut={()=>db.auth.signOut()} email={session.user.email}/>;
-      return <Dashboard session={session} userRole={userRole}/>;
-    }
-
-    ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
-  </script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-</body>
-</html>
-{ setSession(s||null); if(s) fetchRole(s.user.id); });
         const {data:{subscription}}=db.auth.onAuthStateChange((_e,s)=>{ setSession(s||null); if(s) fetchRole(s.user.id); else { setUserRole(null); } });
         return ()=>subscription.unsubscribe();
       },[fetchRole]);
