@@ -115,11 +115,11 @@
     const FInput = ({value,onChange,placeholder,type="text",required,disabled}) => <input type={type} value={value||""} onChange={onChange} placeholder={placeholder} required={required} disabled={disabled} className={`${iCls} ${dCls}`}/>;
     const FSel   = ({value,onChange,options,placeholder,disabled}) => <select value={value||""} onChange={onChange} disabled={disabled} className={`${iCls} bg-white ${dCls}`}><option value="">{placeholder||"Select\u2026"}</option>{options.map(o=><option key={o} value={o}>{o}</option>)}</select>;
     const FTxt   = ({value,onChange,placeholder,rows=3,disabled}) => <textarea value={value||""} onChange={onChange} placeholder={placeholder} rows={rows} disabled={disabled} className={`${iCls} resize-none ${dCls}`}/>;
-    const Tog    = ({options,value,onChange,disabled}) => <div className="flex flex-wrap gap-1.5">{options.map(o=><button key={o} type="button" onClick={()=>!disabled&&onChange(o)} disabled={disabled} className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${value===o?"bg-[#1B1B1B] text-[#FFDD2F] border-[#1B1B1B]":"bg-white text-gray-600 border-gray-200 hover:border-gray-400"} disabled:opacity-40`}>{o}</button>)}</div>;
+    const Tog    = ({options,value,onChange,disabled}) => <div className="flex flex-wrap gap-1.5">{options.map(o=><button key={o} type="button" onClick={()=>!disabled&&onChange(o)} disabled={disabled} className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${value===o?"bg-[#1B1B1B] text-[#FFDD2F] border-[#1B1B1B]":"bg-white text-gray-600 border-gray-200 hover:border-gray-400"} disabled:opacity-40`"}>{o}</button>)}</div>;
     const MTog   = ({options,values=[],onChange,disabled}) => <div className="flex flex-wrap gap-1.5">{options.map(o=>{ const s=values.includes(o); return <button key={o} type="button" onClick={()=>!disabled&&onChange(s?values.filter(v=>v!==o):[...values,o])} disabled={disabled} className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${s?"bg-[#FFDD2F] text-[#1B1B1B] border-[#FFDD2F]":"bg-white text-gray-600 border-gray-200 hover:border-gray-400"} disabled:opacity-40`}>{o}</button>; })}</div>;
     const FSec   = ({title,children}) => <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4"><p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{title}</p>{children}</div>;
 
-    // ââ Auth screens ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    // ââ Auth screens âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     const LoadingScreen = () => (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#1B1B1B]">
         <img src="https://www.mavlers.com/images/MavlersLogo.svg" alt="Mavlers" className="h-9 mb-8 brightness-0 invert"/>
@@ -187,23 +187,7 @@
                 {tab!=="forgot" && <div><FLabel req>Password</FLabel><FInput type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" required/></div>}
                 {err && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 border border-red-100">{err}</p>}
                 {ok  && <p className="text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2 border border-green-100">{ok}</p>}
-                <button type="submit" disabled={busy} className="w-full py-3 rounded-xl text-sm font-bold bg-[#FFDD2F] text-[#1B1B1B] hover:bg-[#f5d000] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
-                  {busy?<><Spinner sz="w-4 h-4" c="border-[#1B1B1B]"/>Please wait&#8230;</>:tab==="login"?"Sign In \u2192":tab==="signup"?"Create Account":"Send Reset Link"}
-                </button>
-                {tab==="login"  && <button type="button" onClick={()=>sw("forgot")} className="w-full text-xs text-gray-400 hover:text-[#1B1B1B] text-center">Forgot password?</button>}
-                {tab==="forgot" && <button type="button" onClick={()=>sw("login")}  className="w-full text-xs text-gray-400 hover:text-[#1B1B1B] text-center">\u2190 Back to Sign In</button>}
-              </form>
-            </div>
-            <p className="text-center text-xs text-gray-500 mt-5">Only authorized Mavlers team members can access this tool.</p>
-          </div>
-        </div>
-      );
-    };
-
-    // ââ Stat card âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-    const StatCard = ({label,value,sub,hi}) => (
-      <div className={`bg-white rounded-xl p-4 shadow-sm border hover:shadow-md transition-shadow ${hi?"border-[#FFDD2F] border-2":"border-gray-100"}`}>
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{label}</p>
+            der mb-2">{label}</p>
         <p className="text-2xl font-extrabold text-[#1B1B1B] leading-none">{value}</p>
         {sub && <p className="text-xs text-gray-400 mt-1.5 font-medium">{sub}</p>}
       </div>
@@ -254,6 +238,16 @@
         <div key="c" className="space-y-4">
           <FSec title="Client Info"><div className="grid grid-cols-2 gap-3">
             <div className="col-span-2"><FLabel req={!ops}>Client / Company Name</FLabel><FInput value={form.clientName} onChange={f("clientName")} placeholder="e.g. Acme Corp" required={!ops} disabled={ops}/></div>
+            <div><FLabel>Domain / Industry</FLabel><FInput value={form.industry} onChange={f("industry")} placeholder="e.g. E-commerce, Fintech" disabled={ops}/></div>
+            <div><FLabel>Company Size</FLabel><FSel value={form.clientSize} onChange={f("clientSize")} options={["SMB","Mid-Market","Enterprise"]} disabled={ops}/></div>
+            <div><FLabel>Website</FLabel><FInput value={form.website} onChange={f("website")} placeholder="https://" disabled={ops}/></div>
+            <div><FLabel>Source</FLabel><FSel value={form.source} onChange={f("source")} options={SOURCES} placeholder="Select source" disabled={ops}/></div>
+          </div></FSec>
+          <FSec title="Point of Contact"><div className="grid grid-cols-2 gap-3">
+            <div><FLabel>POC Name</FLabel><FInput value={form.pocName} onChange={f("pocName")} placeholder="e.g. Jane Doe" disabled={ops}/></div>
+            <div><FLabel>POC Title</FLabel><FInput value={form.pocTitle} onChange={f("pocTitle")} placeholder="e.g. Head of Marketing" disabled={ops}/></div>
+            <div><FLabel>POC Email</FLabel><FInput type="email" value={form.pocEmail} onChange={f("pocEmail")} placeholder="jane@company.com" disabled={ops}/></div>
+            <div><FLabel>POC Phone</FLabel><FInput value={form.pocPhone} onCha       <div className="col-span-2"><FLabel req={!ops}>Client / Company Name</FLabel><FInput value={form.clientName} onChange={f("clientName")} placeholder="e.g. Acme Corp" required={!ops} disabled={ops}/></div>
             <div><FLabel>Domain / Industry</FLabel><FInput value={form.industry} onChange={f("industry")} placeholder="e.g. E-commerce, Fintech" disabled={ops}/></div>
             <div><FLabel>Company Size</FLabel><FSel value={form.clientSize} onChange={f("clientSize")} options={["SMB","Mid-Market","Enterprise"]} disabled={ops}/></div>
             <div><FLabel>Website</FLabel><FInput value={form.website} onChange={f("website")} placeholder="https://" disabled={ops}/></div>
@@ -651,200 +645,358 @@
                 <button onClick={saveWH} disabled={wbBusy} className="px-4 py-2 bg-[#1B1B1B] text-[#FFDD2F] rounded-lg text-xs font-bold hover:bg-black disabled:opacity-60 whitespace-nowrap transition-colors">{wbBusy?"Saving&#8230;":"Save"}</button>
               </div>
               {wbOk && <p className="text-xs text-green-700">{wbOk}</p>}
-              <p className="text-[10px] text-gray-400">Payload includes event type, client name, stage, timestamp. Google Space: add an incoming webhook to your Space and paste the URL here.</p>
+              <p className="text-[10px] text-gray-400">Payload includes: event type, client name, stage, timestamp. Google Space: add an incoming webhook to your Space and paste the URL here.</p>
             </div>
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 bor\XÜ\YÜ^KLLÈÛ\ÜÓ[YOH^\ÛHÛXÛ^VÈÌPPPHXØÙ\ÜÈ\ÝÜ[Û\ÜÓ[YOH^YÜ^KMÛ[ÜX[Û\Ý[ÝJOÜÜ[ÚÏÛ\ÜÓ[YOH^^È^YÜ^KM]LHKX\ÝY[XZ[ËÜY[ÝHÚYÛY\ÜÙ]Û\Ý[ÝOOLÈÛ\ÜÓ[YOH^\ÛH^YÜ^KM^XÙ[\KLLÈY[X\ÈYYY]Ü]Û\ÜÓ[YOH]YK^H]YKYÜ^KMLÛ\ÝX\
-OOÈÛÛÝXÝ]O\Û\Ë[
-O[XZ[OOXK[XZ[
-NÈ]\
-]Ù^O^ØKYHÛ\ÜÓ[YOH^][\ËXÙ[\\ÝYKX]ÙY[MHKLËHÝ\ËYÜ^KML[Ú][ÛXÛÛÜÈ]Û\ÜÓ[YOHZ[]ËL^LHÛ\ÜÓ[YOH^\ÛHÛ\Ù[ZXÛ^VÈÌPPPH[Ø]HØK[Û[Y_K[XZ[OÜØK[Û[YIÛ\ÜÓ[YOH^^È^YÜ^KM[Ø]HØK[XZ[OÜOÙ]]Û\ÜÓ[YOH^][\ËXÙ[\Ø\LH[LÈ^\Ú[ËLÛPYÙHÛO^ØKÛ_KÏ]Û\ÜÓ[YO^ØËLLÝ[YY[	ØXÝ]OÈËYÜY[MËYÜ^KLXKÏ]ÛÛÛXÚÏ^Ê
-OOJKYK[XZ[
-_HÛ\ÜÓ[YOH^YÜ^KLÌÝ\^\YM^^XY[Ë[ÛH[Ú][ÛXÛÛÜÈ[Y\ÎÏØ]ÛÙ]Ù]NÂJ_OÙ]BÙ]Ù]
-NÂNÂËÈ8¥ 8¥ \ÚØ\8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ ÛÛÝ\ÚØ\H
-ÜÙ\ÜÚ[Û\Ù\Û_JHOÂÛÛÝÜÛK[Û[Y_HH\Ù\ÛNÂÛÛÝZYHÙ\ÜÚ[Û\Ù\YÂÛÛÝY[XZ[HÙ\ÜÚ[Û\Ù\[XZ[ÂÛÛÝ[[YHH[Û[Y_Y[XZ[Ü]
-VÌNÂÛÛÝ\ÕHHÛOOOHHÂÛÛÝÛÜËÙ]Ü×HH\ÙTÝ]J×JNÂÛÛÝÛØY[ËÙ]ØYHH\ÙTÝ]JYJNÂÛÛÝÜÙX\ÚÙ]ÙX\ÚHH\ÙTÝ]JNÂÛÛÝÙÝYÙKÙ]ÝYÙWHH\ÙTÝ]JNÂÛÛÝÙÜËÙ]Ü×HH\ÙTÝ]JNÂÛÛÝÛ[Ù[Ù][Ù[HH\ÙTÝ]J[
-NÂÛÛÝÛ]Ù]]HH\ÙTÝ]J\ÕOÈ\[ÈÜÈNÂÛÛÝÜÛÜÙ]ÛÜHH\ÙTÝ]JÙY[ÜX]YØ]\\ØÈJNÂÛÛÝÙ[YÙ][YHH\ÙTÝ]J[
-NÂÛÛÝÜÝYÙTÜ\Ù]ÝYÙTÜ\HH\ÙTÝ]J[
-NÂÛÛÝÜÝYÙP\ÞKÙ]ÝYÙP\ÞWHH\ÙTÝ]J[
-NÂÛÛÝÙÙ[Ù[Ù]Ù[Ù[HH\ÙTÝ]J[
-NÂÛÛÝÝÙXÛÚÕ\Ù]Ò\HH\ÙTÝ]JNÂ\ÙQYXÝ
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-[#1B1B1B]">Access List <span className="text-gray-400 font-normal">({list.length})</span></h3>
+              <p className="text-xs text-gray-400 mt-0.5">Pre-approved emails. Green dot = signed up.</p>
+            </div>
+            {list.length===0
+              ? <p className="text-sm text-gray-400 text-center py-10">No members added yet.</p>
+              : <div className="divide-y divide-gray-50">{list.map(a=>{ const active=roles.find(r=>r.email===a.email); return (
+                  <div key={a.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                    <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-[#1B1B1B] truncate">{a.full_name||a.email}</p>{a.full_name&&<p className="text-xs text-gray-400 truncate">{a.email}</p>}</div>
+                    <div className="flex items-center gap-2.5 ml-3 flex-shrink-0"><RoleBadge role={a.role}/><div className={`w-2 h-2 rounded-full ${active?"bg-green-400":"bg-gray-200"}`}/><button onClick={()=>rm(a.id,a.email)} className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors">&times;</button></div>
+                  </div>);
+              })}</div>
+            }
+          </div>
+        </div>
+      );
+    };
 
+    // ââ Dashboard âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    const Dashboard = ({session,userRole}) => {
+      const {role,full_name} = userRole;
+      const uid    = session.user.id;
+      const uemail = session.user.email;
+      const uname  = full_name||uemail.split("@")[0];
+      const isTA   = role==="ta";
 
-OOÂËØY
+      const [opps,setOpps]             = useState([]);
+      const [loading,setLoad]          = useState(true);
+      const [search,setSearch]         = useState("");
+      const [fStage,setFStage]         = useState("");
+      const [fSrc,setFSrc]             = useState("");
+      const [modal,setModal]           = useState(null);
+      const [nav,setNav]               = useState(isTA?"hiring":"opps");
+      const [sort,setSort]             = useState({field:"created_at",dir:"desc"});
+      const [delId,setDelId]           = useState(null);
+      const [stagePopup,setStagePopup] = useState(null);
+      const [stageBusy,setStageBusy]   = useState(null);
+      const [fwdModal,setFwdModal]     = useState(null);
+      const [webhookUrl,setWHUrl]      = useState("");
+      const [viewOpp,setViewOpp]       = useState(null);
 
-K[OÈÙ]ÜÊ
-NÈÙ]ØY
-[ÙJNÈJKØ]Ú
+      useEffect(()=>{
+        dbO.load().then(d=>{ setOpps(d); setLoad(false); }).catch(()=>setLoad(false));
+        dbS.get("notification_webhook").then(u=>setWHUrl(u||"")).catch(()=>{});
+      },[]);
 
+      const pushNotif = async (type,message,oppId,clientName,meta={}) => {
+        try{ await dbN.add({type,message,opportunity_id:oppId,opp_client_name:clientName,meta}); }catch{}
+        fireWebhook(webhookUrl,{type,message,client:clientName,opportunity_id:oppId,timestamp:new Date().toISOString(),...meta});
+      };
 
-OOÙ]ØY
-[ÙJJNÂËÙ]
-ÝYXØ][ÛÝÙXÛÚÈK[OOÙ]Ò\
-_JKØ]Ú
+      const filtered = useMemo(()=>{
+        let r=[...opps];
+        if(search){ const q=search.toLowerCase(); r=r.filter(o=>[o.clientName,o.primaryPlatform,...(o.platforms||[]),o.opportunityOwner,o.source].some(v=>(v||"").toLowerCase().includes(q))); }
+        if(fStage) r=r.filter(o=>o.stage===fStage);
+        if(fSrc)   r=r.filter(o=>o.source===fSrc);
+        r.sort((a,b)=>{ let va=a[sort.field]||"",vb=b[sort.field]||""; if(sort.field==="potentialMonthlyRevenue"){va=Number(va)||0;vb=Number(vb)||0;} return sort.dir==="asc"?(va>vb?1:-1):(va<vb?1:-1); });
+        return r;
+      },[opps,search,fStage,fSrc,sort]);
 
+      const stats = useMemo(()=>{ const active=opps.filter(o=>!["Won","Lost","On Hold"].includes(o.stage)); const won=opps.filter(o=>o.stage==="Won"); return {total:opps.length,active:active.length,pipe:active.reduce((s,o)=>s+(Number(o.potentialMonthlyRevenue)||0),0),won:won.reduce((s,o)=>s+(Number(o.potentialMonthlyRevenue)||0),0)}; },[opps]);
 
-OOßJNÂK×JNÂÛÛÝ\ÚÝYH\Þ[È
-\KY\ÜØYÙKÜYÛY[[YKY]O^ßJHOÂ^È]ØZ]Y
-Ý\KY\ÜØYÙKÜÜ[]WÚYÜYÜØÛY[Û[YNÛY[[YKY]_JNÈXØ]ÚßB\UÙXÛÚÊÙXÛÚÕ\Ý\KY\ÜØYÙKÛY[ÛY[[YKÜÜ[]WÚYÜY[Y\Ý[\]È]J
-KÒTÓÔÝ[Ê
-KY]_JNÂNÂÛÛÝ[\YH\ÙSY[[Ê
+      const togSort = f => setSort(s=>s.field===f?{...s,dir:s.dir==="asc"?"desc":"asc"}:{field:f,dir:"asc"});
+      const Arr     = ({f}) => sort.field===f?<span className="ml-0.5 opacity-50">{sort.dir==="asc"?"&#8593;":"&#8595;"}</span>:null;
 
-OOÂ]VËÜ×NÂYÙX\Ú
-^ÈÛÛÝO\ÙX\ÚÓÝÙ\Ø\ÙJ
-NÈ\[\ÏOÛËÛY[[YKË[X\T]ÜKË]Ü\ß×JKËÜÜ[]SÝÛ\ËÛÝ\ÙWKÛÛYJOKÓÝÙ\Ø\ÙJ
-K[ÛY\ÊJJJNÈBYÝYÙJH\[\ÏOËÝYÙOOOYÝYÙJNÂYÜÊH\[\ÏOËÛÝ\ÙOOOYÜÊNÂÛÜ
+      const handleDel = async id => {
+        if(!confirm("Delete this opportunity? Cannot be undone.")) return;
+        setDelId(id);
+        try{ await dbO.del(id); setOpps(p=>p.filter(o=>o.id!==id)); }catch{}
+        setDelId(null);
+      };
 
-KOOÈ]OXVÜÛÜY[_XÜÛÜY[_ÈYÛÜY[OOHÝ[X[[ÛT][YH^ÝOS[X\J_ÝS[X\_ßH]\ÛÜ\OOH\ØÈÊOÌNLJNOÌNLJNÈJNÂ]\ÂKÛÜËÙX\ÚÝYÙKÜËÛÜJNÂÛÛÝÝ]ÈH\ÙSY[[Ê
+      const handleStageChange = async (oppId, newStage) => {
+        const opp=opps.find(o=>o.id===oppId); if(!opp) return;
+        setStageBusy(oppId); setStagePopup(null);
+        try {
+          const {id,created_at,...payload}=opp;
+          await dbO.upd(oppId,{...payload,stage:newStage,primaryPlatform:(opp.platforms||[])[0]||opp.primaryPlatform||""});
+          setOpps(prev=>prev.map(o=>o.id===oppId?{...o,stage:newStage}:o));
+          const type = newStage==="Won"?"opp_won":"stage_changed";
+          const msg  = newStage==="Won"
+            ? `\u{1F3C6} "${opp.clientName||"Unnamed"}" \u2014 WON! ${opp.potentialMonthlyRevenue?`(${fmtINR(Number(opp.potentialMonthlyRevenue))}/mo)`:""}`
+            : `\u{1F4CB} "${opp.clientName||"Unnamed"}" moved to "${newStage}" by ${uname}`;
+          await pushNotif(type,msg.trim(),oppId,opp.clientName,{old_stage:opp.stage,new_stage:newStage,changed_by:uemail});
+        }catch{}
+        setStageBusy(null);
+      };
 
-OOÈÛÛÝXÝ]O[ÜË[\ÏOVÈÛÛÜÝÛÛK[ÛY\ÊËÝYÙJJNÈÛÛÝÛÛ[ÜË[\ÏOËÝYÙOOOHÛÛNÈ]\ÝÝ[ÜË[ÝXÝ]NXÝ]K[Ý\NXÝ]KYXÙJ
-ËÊOOÊÊ[X\ËÝ[X[[ÛT][YJ_
-K
-KÛÛÛÛYXÙJ
-ËÊOOÊÊ[X\ËÝ[X[[ÛT][YJ_
-K
-_NÈKÛÜ×JNÂÛÛÝÙÔÛÜHOÙ]ÛÜ
-ÏOËY[OOYÞËË\Ë\OOH\ØÈÈ\ØÈ\ØÈNÙY[\\ØÈJNÂÛÛÝ\H
-ÙJHOÛÜY[OOYÏÜ[Û\ÜÓ[YOH[LHÜXÚ]KMLÜÛÜ\OOH\ØÈÈÎ
-NLÎÈÎ
-NMNÈOÜÜ[[ÂÛÛÝ[Q[H\Þ[ÈYOÂYXÛÛ\J[]H\ÈÜÜ[]OÈØ[ÝH[ÛKJH]\ÂÙ][Y
-Y
-NÂ^È]ØZ]Ë[
-Y
-NÈÙ]ÜÊO[\ÏOËYOOZY
-JNÈXØ]ÚßBÙ][Y
-[
-NÂNÂÛÛÝ[TÝYÙPÚ[ÙHH\Þ[È
-ÜY]ÔÝYÙJHOÂÛÛÝÜ[ÜË[
-ÏOËYOO[ÜY
-NÈY[Ü
-H]\ÂÙ]ÝYÙP\ÞJÜY
-NÈÙ]ÝYÙTÜ\
-[
-NÂHÂÛÛÝÚYÜX]YØ]^[ØYO[ÜÂ]ØZ]Ë\
-ÜYË^[ØYÝYÙN]ÔÝYÙK[X\T]ÜNÜ]Ü\ß×JVÌ_Ü[X\T]Ü_JNÂÙ]ÜÊ]O]X\
-ÏOËYOO[ÜYÞËËÝYÙN]ÔÝYÙ_NÊJNÂÛÛÝ\HH]ÔÝYÙOOOHÛÛÈÜÝÛÛÝYÙWØÚ[ÙYÂÛÛÝ\ÙÈH]ÔÝYÙOOOHÛÛÈ^ÌQÐÍHÛÜÛY[[Y_[[YYHLMÓÓH	ÛÜÝ[X[[ÛT][YOØ
-	Ù]S[X\ÜÝ[X[[ÛT][YJJ_KÛ[ÊXX^ÌQÐHÛÜÛY[[Y_[[YYH[ÝYÈÛ]ÔÝYÙ_HH	Ý[[Y_XÂ]ØZ]\ÚÝY\K\ÙË[J
-KÜYÜÛY[[YKÛÛÜÝYÙNÜÝYÙK]×ÜÝYÙN]ÔÝYÙKÚ[ÙYØNY[XZ[JNÂXØ]ÚßBÙ]ÝYÙP\ÞJ[
-NÂNÂÛÛÝÛØ]YH\Þ[ÈÈOÂ^ÂÛÛÝ\Ó]ÏH[ÜË[
-OYOO[ËY
-NÂÙ]ÜÊ]OÈÛÛÝO\][[^
-OYOO[ËY
-NÈ]\OLÜ]X\
-OYOO[ËYÛÎ
-NÛË]NÈJNÂY\Ó]ÊH]ØZ]\ÚÝYÜØYYLÌ]ÈÜÜ[]NÛËÛY[[Y_[[YYHYYH	Ý[[Y_XËYËÛY[[YKÜÝYÙNËÝYÙKÝÛ\[[Y_JNÂXØ]ÚÈËØY
+      const onSaved = async o => {
+        try{
+          const isNew=!opps.find(x=>x.id===o.id);
+          setOpps(prev=>{ const i=prev.findIndex(x=>x.id===o.id); return i>=0?prev.map(x=>x.id===o.id?o:x):[o,...prev]; });
+          if(isNew) await pushNotif("opp_added",`\u2728 New opportunity: "${o.clientName||"Unnamed"}" added by ${uname}`,o.id,o.clientName,{stage:o.stage,owner:uname});
+        }catch{ dbO.load().then(d=>setOpps(d)).catch(()=>{}); }
+      };
 
-K[OÙ]ÜÊ
-JKØ]Ú
+      const filtPipe = filtered.reduce((s,o)=>s+(Number(o.potentialMonthlyRevenue)||0),0);
+      const getPlatformDisplay = o => {
+        const p=o.platforms&&o.platforms.length?o.platforms:(o.primaryPlatform?[o.primaryPlatform]:[]);
+        if(!p.length) return "\u2014"; if(p.length===1) return p[0]; return `${p[0]} +${p.length-1}`;
+      };
 
+      const navTabs = [
+        ...(!isTA?[["opps","&#128202; Opportunities"]]:[]),
+        ["hiring","&#127919; Hiring Roles"],
+        ...(can.team(role)?[["team","&#128101; Team"]]:[]),
+      ];
 
-OOßJNÈBNÂÛÛÝ[\HH[\YYXÙJ
-ËÊOOÊÊ[X\ËÝ[X[[ÛT][YJ_
-K
-NÂÛÛÝÙ]]ÜQ\Ü^HHÈOÂÛÛÝ[Ë]Ü\ÉË]Ü\Ë[ÝÛË]Ü\ÎË[X\T]ÜOÖÛË[X\T]ÜWN×JNÂY\[Ý
-H]\LMÈY[ÝOOLJH]\ÌNÈ]\	ÜÌ_H
-ÉÜ[ÝL_XÂNÂÛÛÝ]XÈHÂZ\ÕOÖÖÈÜÈÌLÈÜÜ[]Y\ÈWN×JKÈ\[ÈÌLÎLNNÈ\[ÈÛ\ÈKØ[X[JÛJOÖÖÈX[HÌLLNÈX[HWN×JKNÂ]\
-]Û\ÜÓ[YOHZ[Z\ØÜY[ËYÜ^KML^^XÛÛXY\Û\ÜÓ[YOHËVÈÌPPPHMHKLÈ^][\ËXÙ[\\ÝYKX]ÙY[ÝXÚÞHÜLMÚYÝË^]Û\ÜÓ[YOH^][\ËXÙ[\Ø\LÈ[YÈÜÏHÎËÝÝÝËX]\ËÛÛKÚ[XYÙ\ËÓX]\ÓÙÛËÝÈ[HX]\ÈÛ\ÜÓ[YOHMÈYÚ\ÜËL[\^\Ú[ËLÏ]Û\ÜÓ[YOHË\MHËYÜ^KMÏÜ[Û\ÜÓ[YOH^]Ú]H^\ÛHÛXÛXÚÚ[Ë]ÚYHY[ÛNØÚÈÜÜ[]HXÚÙ\ÜÜ[Ù]]Û\ÜÓ[YOH^][\ËXÙ[\Ø\LHÝYXØ][Û[\Ù\Y^ÝZYKÏ]Û\ÜÓ[YOHË\MHËYÜ^KMÏ]Û\ÜÓ[YOH^\YÚY[YØÚÈÛ\ÜÓ[YOH^]Ú]H^^ÈÛ\Ù[ZXÛXY[Ë]YÚÝ[[Y_OÜÛ\ÜÓ[YOH^YÜ^KML^^ÈÝY[XZ[OÜÙ]ÛPYÙHÛO^ÜÛ_KÏ]ÛÛÛXÚÏ^Ê
-OO]]ÚYÛÝ]
+      return (
+        <div className="min-h-screen bg-gray-50 flex flex-col">
+          <header className="bg-[#1B1B1B] px-5 py-3 flex items-center justify-between sticky top-0 z-40 shadow-xl">
+            <div className="flex items-center gap-3">
+              <img src="https://www.mavlers.com/images/MavlersLogo.svg" alt="Mavlers" className="h-7 brightness-0 invert flex-shrink-0"/>
+              <div className="w-px h-5 bg-gray-600"/>
+              <span className="text-white text-sm font-bold tracking-wide hidden sm:block">Opportunity Tracker</span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <NotificationBell userId={uid}/>
+              <div className="w-px h-5 bg-gray-600"/>
+              <div className="text-right hidden md:block"><p className="text-white text-xs font-semibold leading-tight">{uname}</p><p className="text-gray-500 text-xs">{uemail}</p></div>
+              <RoleBadge role={role}/>
+              <button onClick={()=>db.auth.signOut()} className="text-xs text-gray-500 hover:text-[#FFDD2F] font-medium transition-colors ml-1">Sign out</button>
+            </div>
+          </header>
 
-_HÛ\ÜÓ[YOH^^È^YÜ^KMLÝ\^VÈÑHÛ[YY][H[Ú][ÛXÛÛÜÈ[LHÚYÛÝ]Ø]ÛÙ]ÚXY\]Û\ÜÓ[YOHË]Ú]HÜ\XÜ\YÜ^KLMH]Û\ÜÓ[YOH^Û]XËX\
+          <div className="bg-white border-b border-gray-200 px-5">
+            <div className="flex">
+              {navTabs.map(([t,l])=>(
+                <button key={t} onClick={()=>setNav(t)} className={`py-3 px-4 text-xs sm:text-sm font-bold transition-all border-b-2 ${nav===t?"border-[#FFDD2F] text-[#1B1B1B]":"border-transparent text-gray-400 hover:text-gray-600"}`} dangerouslySetInnerHTML={{__html:l}}/>
+              ))}
+            </div>
+          </div>
 
-ÝJOO]ÛÙ^O^ÝHÛÛXÚÏ^Ê
-OOÙ]]
-_HÛ\ÜÓ[YO^ØKLÈM^^ÈÛN^\ÛHÛXÛ[Ú][ÛX[Ü\XL	Û]OO]ÈÜ\VÈÑH^VÈÌPPPHÜ\][Ü\[^YÜ^KMÝ\^YÜ^KMXH[Ù\Ý\ÛTÙ][\S^Þ××Ú[_KÏ
-J_BÙ]Ù]Û]OOHX[HØ[X[JÛJHÈX[TYÙKÏ]OOH\[ÈÈ\[ÔÛ\ÔYÙHÛO^ÜÛ_KÏ
-]Û\ÜÓ[YOH^LHMÛNMX^]ËMÞ^X]]ÈËY[]Û\ÜÓ[YOHÜYÜYXÛÛËLÎÜYXÛÛËMØ\LÈXMHÝ]Ø\X[HÝ[ÜÈ[YO^ÜÝ]ËÝ[KÏÝ]Ø\X[HXÝ]H\[[H[YO^ÜÝ]ËXÝ]_HÝXH^ÛÛÛÈÜÝÏÝ]Ø\X[H[ÛH\[[H[YO^Ù]SÝ]Ë\J_HHÝXHXÝ]HÜÈÏÝ]Ø\X[H[ÛHÛÛ[YO^Ù]SÝ]ËÛÛ_HÝXHÛÜÙYÏÙ]]Û\ÜÓ[YOHË]Ú]HÝ[Y^Ü\Ü\YÜ^KLLÚYÝË\ÛHLÈXM]Û\ÜÓ[YOH^^]Ü\Ø\L][\ËXÙ[\[][YO^ÜÙX\ÚHÛÚ[ÙO^ÙOOÙ]ÙX\Ú
-K\Ù][YJ_HXÙZÛ\HÌLNÈÙX\ÚÛY[]ÜKÝÛ\ÎÌÈÛ\ÜÓ[YOH^LHZ[]ËLÍLÈKLÜ\Ü\YÜ^KLÝ[Y[È^\ÛHØÝ\ÎÝ][K[ÛHØÝ\Î[ËLØÝ\Î[ËVÈÑHÏÙ[XÝ[YO^ÙÝYÙ_HÛÚ[ÙO^ÙOOÙ]ÝYÙJK\Ù][YJ_HÛ\ÜÓ[YOHLÈKLÜ\Ü\YÜ^KLÝ[Y[È^\ÛHË]Ú]HØÝ\ÎÝ][K[ÛHØÝ\Î[ËLØÝ\Î[ËVÈÑHÜ[Û[YOH[ÝYÙ\ÏÛÜ[ÛÔÕQÑTËX\
-ÏOÜ[ÛÙ^O^ÜßH[YO^ÜßOÜßOÛÜ[Û_OÜÙ[XÝÙ[XÝ[YO^ÙÜßHÛÚ[ÙO^ÙOOÙ]ÜÊK\Ù][YJ_HÛ\ÜÓ[YOHLÈKLÜ\Ü\YÜ^KLÝ[Y[È^\ÛHË]Ú]HØÝ\ÎÝ][K[ÛHØÝ\Î[ËLØÝ\Î[ËVÈÑHÜ[Û[YOH[ÛÝ\Ù\ÏÛÜ[ÛÔÓÕTÑTËX\
-ÏOÜ[ÛÙ^O^ÜßH[YO^ÜßOÜßOÛÜ[Û_OÜÙ[XÝÊÝYÙ_ÜßÙX\Ú
-I]ÛÛÛXÚÏ^Ê
-OOÜÙ]ÙX\Ú
-NÜÙ]ÝYÙJNÜÙ]ÜÊNß_HÛ\ÜÓ[YOHLÈKL^^ÈÛ\Ù[ZXÛ^YÜ^KMÝ\^\YMLÜ\Ü\YÜ^KLÝ[Y[È[Ú][ÛXÛÛÜÈÌL
-NÈÛX\Ø]ÛB]Û\ÜÓ[YOH^LHÏØØ[ÜX]JÛJI]ÛÛÛXÚÏ^Ê
-OOÙ][Ù[
-Û[ÙNYJ_HÛ\ÜÓ[YOH^][\ËXÙ[\Ø\LKHMKLËVÈÑH^VÈÌPPPHÝ[Y[È^\ÛHÛXÛÝ\ËVÈÙYH[Ú][ÛXÛÛÜÈÚ]\ÜXÙK[ÝÜ\ÚYÝË\ÛHÈYÜÜ[]OØ]ÛBÈÙ]Ù]]Û\ÜÓ[YOHË]Ú]HÝ[Y^Ü\Ü\YÜ^KLLÚYÝË\ÛHÝ\ÝËZY[ÛØY[ÂÈ]Û\ÜÓ[YOH^^XÛÛ][\ËXÙ[\\ÝYKXÙ[\LMØ\MÜ[\ÞHËNNÏÛ\ÜÓ[YOH^\ÛH^YÜ^KMØY[ÈÜÜ[]Y\ÉÎÌÏÜÙ][\Y[ÝOOLÈ]Û\ÜÓ[YOH^XÙ[\KLM]Û\ÜÓ[YOH^M^XLÈÌLÎÏÙ]Û\ÜÓ[YOH^YÜ^KMÛ\Ù[ZXÛÈÜÜ[]Y\ÈÝ[ÜÛ\ÜÓ[YOH^YÜ^KM^\ÛH]LHØØ[ÜX]JÛJOÈÛXÚÈ
-ÈYÜÜ[]HÈÙ]Ý\YÈ[Y\ÈX]Ú[Ý\[\ËOÜÙ]
-]Û\ÜÓ[YOHÝ\ÝË^X]]ÈXHÛ\ÜÓ[YOHËY[^\ÛHXYÛ\ÜÓ[YOHÜ\XÜ\YÜ^KLL^^È^YÜ^KMÛXÛ\\Ø\ÙHXÚÚ[Ë]ÚYHËYÜ^KMLÎÛ\ÜÓ[YOHMHKLÈ^[YÝ\ÛÜ\Ú[\Ý\^VÈÌPPPHÙ[XÝ[ÛHÛÛXÚÏ^Ê
-OOÙÔÛÜ
-ÛY[[YH_OÛY[\HÛY[[YHÏÝÛ\ÜÓ[YOHMKLÈ^[YÝ\ÛÜ\Ú[\Ý\^VÈÌPPPHÙ[XÝ[ÛHÛÛXÚÏ^Ê
-OOÙÔÛÜ
-[X\T]ÜH_O]ÜO\H[X\T]ÜHÏÝÛ\ÜÓ[YOHMKLÈ^[YÝ\ÛÜ\Ú[\Ý\^VÈÌPPPHÙ[XÝ[ÛHÛÛXÚÏ^Ê
-OOÙÔÛÜ
-ÝYÙH_OÝYÙO\HÝYÙHÏÝÛ\ÜÓ[YOHMKLÈ^[YÝ\ÛÜ\Ú[\Ý\^VÈÌPPPHÙ[XÝ[ÛHÛÛXÚÏ^Ê
-OOÙÔÛÜ
-Ý[X[[ÛT][YH_O][YO\HÝ[X[[ÛT][YHÏÝÛ\ÜÓ[YOHMKLÈ^[YY[YXKXÙ[ÛÝ\ÙOÝÛ\ÜÓ[YOHMKLÈ^[YY[ÎXKXÙ[ÝÛ\ÝÛ\ÜÓ[YOHMKLÈ^[YY[XKXÙ[Ý\ÛÜ\Ú[\Ý\^VÈÌPPPHÙ[XÝ[ÛHÛÛXÚÏ^Ê
-OOÙÔÛÜ
-ÜX]YØ]_OYY\HÜX]YØ]ÏÝÛ\ÜÓ[YOHMKLÈËLÍÏÝÝXYÙHÛ\ÜÓ[YOH]YK^H]YKYÜ^KMLÙ[\YX\
-ÏOÙ^O^ÛËYHÛ\ÜÓ[YOHÝ\ËVÈÑQWH[Ú][ÛXÛÛÜÈÜÝ\Û\ÜÓ[YOHMHKLËHÛ\ÜÓ[YOHÛXÛ^VÈÌPPPH[Ø]HX^]ËVÌNHÛËÛY[[Y_Ü[Û\ÜÓ[YOH^YÜ^KLÌ][XÈÛ[ÜX[[[YYÜÜ[OÜÛË[\ÝIÛ\ÜÓ[YOH^^È^YÜ^KMÛË[\Ý_^ÛËÛY[Ú^OØLÈ	ÛËÛY[Ú^_XOÜOÝÛ\ÜÓ[YOHMKLËH^YÜ^KM[Ø]HX^]ËVÌMHÙÙ]]ÜQ\Ü^JÊ_OÝÛ\ÜÓ[YOHMKLËH[]]HÜÝYÙP\ÞOOO[ËYÈÜ[\ÞHËMMÏHÜ\YÜ^KMÏ]Û\ÜÓ[YOH[]]H[[KXØÚÈ]ÛÛÛXÚÏ^Ê
-OOØ[Y]
-ÛKËZY
-OÜÙ]ÝYÙTÜ\
-ÝYÙTÜ\OO[ËYÛ[ËY
-N[H]O^ØØ[Y]
-ÛKËZY
-OÈÛXÚÈÈÚ[ÙHÝYÙH[Y[YHÛ\ÜÓ[YO^Ø	ØØ[Y]
-ÛKËZY
-OÈÝ\ÛÜ\Ú[\Ý\ÜXÚ]KNÝ\ÛÜYY][H[Ú][Û[ÜXÚ]XOÝYÙPYÙHÝYÙO^ÛËÝYÙ_]ÈXYKÏØ]ÛÜÝYÙTÜ\OO[ËY	ÝYÙQÜÝÛÝ\[ÝYÙO^ÛËÝYÙ_]ÈXYHÛÙ[XÝ^ÜÏO[TÝYÙPÚ[ÙJËYÊ_HÛÛÜÙO^Ê
-OOÙ]ÝYÙTÜ\
-[
-_KÏBÙ]BÝÛ\ÜÓ[YOHMKLËHÜ[Û\ÜÓ[YO^ØÛXÛ	ÛËÝ[X[[ÛT][YOÈ^VÈÌPPPH^YÜ^KLÌXOÛËÝ[X[[ÛT][YOÙ]S[X\ËÝ[X[[ÛT][YJJNLMOÜÜ[ÝÛ\ÜÓ[YOHMKLËH^YÜ^KMLY[YXKXÙ[ÛËÛÝ\Ù_LMOÝÛ\ÜÓ[YOHMKLËH^YÜ^KML^^ÈY[ÎXKXÙ[[Ø]HX^]ËVÌLHÛËÜÜ[]SÝÛ\LMOÝÛ\ÜÓ[YOHMKLËH^YÜ^KM^^ÈY[XKXÙ[Ú]\ÜXÙK[ÝÜ\Ù]]JËÜX]YØ]
-_OÝÛ\ÜÓ[YOHMKLËH]Û\ÜÓ[YOH^Ø\LH\ÝYKY[ÜXÚ]KLÜÝ\ZÝ\ÜXÚ]KLL[Ú][Û[ÜXÚ]HØØ[ÜØ\JÛJI]ÛÛÛXÚÏ^Ê
-OOÙ]Ù[Ù[
-Ê_HÛ\ÜÓ[YOHLHKLKH^^ÈÛXÛÝ[Y[ÈË[Ü[ÙKML^[Ü[ÙKMÝ\Ë[Ü[ÙKLL[Ú][ÛXÛÛÜÈÚ]\ÜXÙK[ÝÜ\]OHÜØ\ÈHÌLÎLNNÈOØ]ÛBØØ[Y]
-ÛKËZY
-I]ÛÛÛXÚÏ^Ê
-OOÙ][Ù[
-Û[ÙNY]]NßJ_HÛ\ÜÓ[YOHLHKLKH^^ÈÛXÛÝ[Y[ÈËVÈÑKÌ^VÈÌPPPHÝ\ËVÈÑH[Ú][ÛXÛÛÜÈY]Ø]ÛBØØ[[
-ÛJI]ÛÛÛXÚÏ^Ê
-OO[Q[
-ËY
-_H\ØXY^Ù[YOO[ËYHÛ\ÜÓ[YOHLHKLKH^^ÈÛXÛÝ[Y[ÈËYÜ^KLL^YÜ^KMLÝ\Ë\YMLÝ\^\YM\ØXYÜXÚ]KML[Ú][ÛXÛÛÜÈÙ[YOO[ËYÈÎÌÈ[OØ]ÛBÙ]ÝÝ
-J_BÝÙOÝXOÙ]]Û\ÜÓ[YOHMHKLÈÜ\]Ü\YÜ^KLLËYÜ^KMLÍL^][\ËXÙ[\\ÝYKX]ÙY[^]Ü\Ø\LÛ\ÜÓ[YOH^^È^YÜ^KMÛ[YY][HÚÝÚ[ÈÝÛÈÛ\ÜÓ[YOH^VÈÌPPPHÙ[\Y[ÝOÜÝÛÏÙÝÛÈÛ\ÜÓ[YOH^VÈÌPPPHÛÜË[ÝOÜÝÛÏÜÜ[]Y\ÏÜÛ\ÜÓ[YOH^^È^YÜ^KMÛ[YY][H[\Y\[[NÝÛÈÛ\ÜÓ[YOH^VÈÌPPPHÙ]S[\J_OÜÝÛÏÜÙ]ÏBBÙ]Ù]
-_BÛ[Ù[	Ü[Ù[Y]]O^Û[Ù[[ÙOOOHY]Û[Ù[]N[H\Ù\Y^ÝZYHÛO^ÜÛ_HÛÛÜÙO^Ê
-OOÈÙ][Ù[
-[
-NÈËØY
+          {nav==="team"&&can.team(role) ? <TeamPage/> :
+           nav==="hiring"               ? <HiringRolesPage role={role}/> : (
+            <div className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+                <StatCard label="Total Opps"       value={stats.total}/>
+                <StatCard label="Active Pipeline"  value={stats.active} sub="excl. Won / Lost"/>
+                <StatCard label="Monthly Pipeline" value={fmtINR(stats.pipe)} hi sub="active opps"/>
+                <StatCard label="Monthly Won"      value={fmtINR(stats.won)}  sub="closed"/>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 mb-4">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="&#128269;  Search client, platform, owner&#8230;" className="flex-1 min-w-36 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"/>
+                  <select value={fStage} onChange={e=>setFStage(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"><option value="">All Stages</option>{STAGES.map(s=><option key={s} value={s}>{s}</option>)}</select>
+                  <select value={fSrc}   onChange={e=>setFSrc(e.target.value)}   className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"><option value="">All Sources</option>{SOURCES.map(s=><option key={s} value={s}>{s}</option>)}</select>
+                  {(fStage||fSrc||search)&&<button onClick={()=>{setSearch("");setFStage("");setFSrc("");}} className="px-3 py-2 text-xs font-semibold text-gray-400 hover:text-red-500 border border-gray-200 rounded-lg transition-colors">&#10005; Clear</button>}
+                  <div className="flex-1"/>
+                  {can.create(role)&&<button onClick={()=>setModal({mode:"add"})} className="flex items-center gap-1.5 px-4 py-2 bg-[#FFDD2F] text-[#1B1B1B] rounded-lg text-sm font-bold hover:bg-[#f5d000] transition-colors whitespace-nowrap shadow-sm">+ Add Opportunity</button>}
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                {loading
+                  ? <div className="flex flex-col items-center justify-center p-16 gap-4"><Spinner sz="w-8 h-8"/><p className="text-sm text-gray-400">Loading opportunities&#8230;</p></div>
+                  : filtered.length===0
+                    ? <div className="text-center py-16"><div className="text-5xl mb-3">&#128203;</div><p className="text-gray-600 font-semibold">No opportunities found</p><p className="text-gray-400 text-sm mt-1">{can.create(role)?"Click + Add Opportunity to get started.":"No entries match your filters."}</p></div>
+                    : (<>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-gray-100 text-xs text-gray-400 font-bold uppercase tracking-wide bg-gray-50/80">
+                                <th className="px-5 py-3 text-left cursor-pointer hover:text-[#1B1B1B] select-none" onClick={()=>togSort("clientName")}>Client<Arr f="clientName"/></th>
+                                <th className="px-4 py-3 text-left cursor-pointer hover:text-[#1B1B1B] select-none" onClick={()=>togSort("primaryPlatform")}>Platform<Arr f="primaryPlatform"/></th>
+                                <th className="px-4 py-3 text-left cursor-pointer hover:text-[#1B1B1B] select-none" onClick={()=>togSort("stage")}>Stage<Arr f="stage"/></th>
+                                <th className="px-4 py-3 text-left cursor-pointer hover:text-[#1B1B1B] select-none" onClick={()=>togSort("potentialMonthlyRevenue")}>Revenue<Arr f="potentialMonthlyRevenue"/></th>
+                                <th className="px-4 py-3 text-left hidden md:table-cell">Source</th>
+                                <th className="px-4 py-3 text-left hidden lg:table-cell">Owner</th>
+                                <th className="px-4 py-3 text-left hidden xl:table-cell cursor-pointer hover:text-[#1B1B1B] select-none" onClick={()=>togSort("created_at")}>Added<Arr f="created_at"/></th>
+                                <th className="px-4 py-3 w-36"/>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {filtered.map(o=>(
+                                <tr key={o.id} onClick={()=>setViewOpp(o)} className="hover:bg-[#FFFEF5] transition-colors group cursor-pointer">
+                                  <td className="px-5 py-3.5"><p className="font-bold text-[#1B1B1B] truncate max-w-[180px]">{o.clientName||<span className="text-gray-300 italic font-normal">Unnamed</span>}</p>{o.industry&&<p className="text-xs text-gray-400">{o.industry}{o.clientSize?` \u00B7 ${o.clientSize}`:""}</p>}</td>
+                                  <td className="px-4 py-3.5 text-gray-600 truncate max-w-[140px]">{getPlatformDisplay(o)}</td>
+                                  <td className="px-4 py-3.5 relative" onClick={e=>e.stopPropagation()}>
+                                    {stageBusy===o.id
+                                      ? <Spinner sz="w-4 h-4" c="border-gray-400"/>
+                                      : <div className="relative inline-block">
+                                          <button onClick={()=>can.edit(role,o,uid)?setStagePopup(stagePopup===o.id?null:o.id):null} title={can.edit(role,o,uid)?"Click to change stage":undefined} className={`${can.edit(role,o,uid)?"cursor-pointer hover:opacity-80":"cursor-default"} transition-opacity`}>
+                                            <StageBadge stage={o.stage||"New Lead"}/>
+                                          </button>
+                                          {stagePopup===o.id && <StageDropdown currentStage={o.stage||"New Lead"} onSelect={s=>handleStageChange(o.id,s)} onClose={()=>setStagePopup(null)}/>}
+                                        </div>
+                                    }
+                                  </td>
+                                  <td className="px-4 py-3.5"><span className={`font-bold ${o.potentialMonthlyRevenue?"text-[#1B1B1B]":"text-gray-300"}`}>{o.potentialMonthlyRevenue?fmtINR(Number(o.potentialMonthlyRevenue)):"\u2014"}</span></td>
+                                  <td className="px-4 py-3.5 text-gray-500 hidden md:table-cell">{o.source||"\u2014"}</td>
+                                  <td className="px-4 py-3.5 text-gray-500 text-xs hidden lg:table-cell truncate max-w-[120px]">{o.opportunityOwner||"\u2014"}</td>
+                                  <td className="px-4 py-3.5 text-gray-400 text-xs hidden xl:table-cell whitespace-nowrap">{fmtDate(o.created_at)}</td>
+                                  <td className="px-4 py-3.5" onClick={e=>e.stopPropagation()}>
+                                    <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                      {can.forwardTA(role)&&<button onClick={()=>setFwdModal(o)} className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors whitespace-nowrap" title="Forward to TA">&#127919; TA</button>}
+                                      {can.edit(role,o,uid)&&<button onClick={()=>setModal({mode:"edit",data:o})} className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-[#FFDD2F]/20 text-[#1B1B1B] hover:bg-[#FFDD2F] transition-colors">Edit</button>}
+                                      {can.del(role)&&<button onClick={()=>handleDel(o.id)} disabled={delId===o.id} className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 transition-colors">{delId===o.id?"&#8230;":"Del"}</button>}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between flex-wrap gap-2">
+                          <p className="text-xs text-gray-400 font-medium">Showing <strong className="text-[#1B1B1B]">{filtered.length}</strong> of <strong className="text-[#1B1B1B]">{opps.length}</strong> opportunities</p>
+                          <p className="text-xs text-gray-400 font-medium">Filtered pipeline: <strong className="text-[#1B1B1B]">{fmtINR(filtPipe)}</strong></p>
+                        </div>
+                      </>)
+                }
+              </div>
+            </div>
+          )}
+          {modal    && <OppModal editData={modal.mode==="edit"?modal.data:null} userId={uid} role={role} onClose={()=>{ setModal(null); dbO.load().then(d=>setOpps(d)).catch(()=>{}); }} onSaved={onSaved}/>}
+          {fwdModal && <ForwardToTAModal opp={fwdModal} userEmail={uemail} userName={uname} onClose={()=>setFwdModal(null)} onForwarded={()=>{}}/>}
+          {viewOpp  && <ViewPanel opp={viewOpp} onClose={()=>setViewOpp(null)} role={role} uid={uid} onEdit={()=>{ setModal({mode:"edit",data:viewOpp}); setViewOpp(null); }}/>}
+        </div>
+      );
+    };
 
-K[OÙ]ÜÊ
-JKØ]Ú
+    // ââ View Panel (read-only slide-in) ââââââââââââââââââââââââââââââââââââââ
+    const ViewPanel = ({opp, onClose, role, uid, onEdit}) => {
+      const Row = ({label, value}) => value ? (
+        <div className="py-2.5 border-b border-gray-50 last:border-0">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
+          <p className="text-sm text-[#1B1B1B] font-medium leading-snug">{value}</p>
+        </div>
+      ) : null;
 
+      const platforms = opp.platforms && opp.platforms.length ? opp.platforms : (opp.primaryPlatform ? [opp.primaryPlatform] : []);
+      const sm = STAGE_META[opp.stage||"New Lead"] || STAGE_META["New Lead"];
 
-OOßJNÈ_HÛØ]Y^ÛÛØ]YKÏBÙÙ[Ù[	ÜØ\ÕS[Ù[Ü^ÙÙ[Ù[H\Ù\[XZ[^ÝY[XZ[H\Ù\[YO^Ý[[Y_HÛÛÜÙO^Ê
-OOÙ]Ù[Ù[
-[
-_HÛÜØ\Y^Ê
-OOß_KÏBÙ]
-NÂNÂËÈ8¥ 8¥ \ÛÝ8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ [Ý[Û\
+      return (
+        <div className="fixed inset-0 z-[55] flex justify-end" onClick={onClose}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"/>
+          <div className="relative w-full max-w-md bg-white h-full flex flex-col shadow-2xl overflow-hidden"
+               onClick={e=>e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-start justify-between px-5 py-4 bg-[#1B1B1B]">
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-white truncate">{opp.clientName||"Unnamed"}</h2>
+                {opp.industry && <p className="text-xs text-gray-400 mt-0.5">{opp.industry}</p>}
+              </div>
+              <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                <span className={`text-xs font-bold px-2 py-1 rounded-full border ${sm.bg} ${sm.text} ${sm.border}`}>
+                  {opp.stage||"New Lead"}
+                </span>
+                <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 text-lg leading-none transition-colors">&times;</button>
+              </div>
+            </div>
 
-HÂÛÛÝÜÙ\ÜÚ[ÛÙ]Ù\ÜÚ[ÛHH\ÙTÝ]J[Y[Y
-NÂÛÛÝÝ\Ù\ÛKÙ]\Ù\ÛWHH\ÙTÝ]J[
-NÂÛÛÝÜÛSØYÙ]ÛSØYHH\ÙTÝ]J[ÙJNÂÛÛÝ]ÚÛHH\ÙPØ[XÚÊ\Þ[ÈZYOÂÙ]ÛSØY
-YJNÂ^ÈÛÛÝÙ]_OX]ØZ]ÛJ\Ù\ÜÛ\ÈKÙ[XÝ
-ÛK[Û[YK[XZ[K\J\Ù\ÚYZY
-KÚ[ÛJ
-NÈÙ]\Ù\ÛJ]_[
-NÈBØ]ÚÈÙ]\Ù\ÛJ[
-NÈBÙ]ÛSØY
-[ÙJNÂK×JNÂ\ÙQYXÝ
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
 
+              {/* Platforms */}
+              {platforms.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Platform(s)</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {platforms.map(p=>(
+                      <span key={p} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full font-semibold">{p}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-OOÂ]]Ù]Ù\ÜÚ[Û
-K[
-Ù]NÜÙ\ÜÚ[Ûß_JOOÈÙ]Ù\ÜÚ[Ûß[
-NÈYÊH]ÚÛJË\Ù\Y
-NÈJNÂÛÛÝÙ]NÜÝXØÜ\[Û_OY]]Û]]Ý]PÚ[ÙJ
-ÙKÊOOÈÙ]Ù\ÜÚ[Ûß[
-NÈYÊH]ÚÛJË\Ù\Y
-NÈ[ÙHÙ]\Ù\ÛJ[
-NÈJNÂ]\
+              {/* Key details */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-0">
+                <Row label="Opportunity Owner" value={opp.opportunityOwner}/>
+                <Row label="Source"             value={opp.source}/>
+                <Row label="Engagement Type"    value={opp.engagementType}/>
+                <Row label="Billing Model"      value={opp.billingModel}/>
+                <Row label="Estimated Hours"    value={opp.estimatedHours ? `${opp.estimatedHours} hrs` : null}/>
+                <Row label="Potential Monthly Revenue" value={opp.potentialMonthlyRevenue ? fmtINR(Number(opp.potentialMonthlyRevenue)) : null}/>
+              </div>
 
-OOÝXØÜ\[Û[ÝXØÜXJ
-NÂKÙ]ÚÛWJNÂYÙ\ÜÚ[ÛOO][Y[YÛSØY
-H]\ØY[ÔØÜY[ÏÂY\Ù\ÜÚ[ÛH]\]]YÙKÏÂY]\Ù\ÛJH]\ÐXØÙ\ÜÈÛÝ]^Ê
-OO]]ÚYÛÝ]
+              {/* Scope / Notes */}
+              {opp.notes && (
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Notes / Scope</p>
+                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded-xl p-4">{opp.notes}</p>
+                </div>
+              )}
 
-_H[XZ[^ÜÙ\ÜÚ[Û\Ù\[XZ[KÏÂ]\\ÚØ\Ù\ÜÚ[Û^ÜÙ\ÜÚ[ÛH\Ù\ÛO^Ý\Ù\Û_KÏÂBXXÝÓKÜX]TÛÝ
-ØÝ[Y[Ù][[Y[RY
-ÛÝJK[\\ÏNÂÜØÜ\ØÜ\ÜÏHÎËÝ[ÙËÛÛKÐX[ÜÝ[[ÛKØX[Z[ÈÜØÜ\ØÙOÚ[
+              {/* Problem statement */}
+              {opp.problemStatement && (
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Problem Statement</p>
+                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded-xl p-4">{opp.problemStatement}</p>
+                </div>
+              )}
+
+              {/* Secondary details */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-0">
+                <Row label="Client Size"         value={opp.clientSize}/>
+                <Row label="POC"                  value={opp.poc}/>
+                <Row label="POC Email"            value={opp.pocEmail}/>
+                <Row label="Expertise Needed"     value={Array.isArray(opp.expertise) ? opp.expertise.join(", ") : opp.expertise}/>
+                <Row label="Copywriting"          value={opp.copywriting}/>
+                <Row label="Email Production"     value={opp.emailProduction}/>
+                <Row label="Timezone"             value={opp.timezone}/>
+                <Row label="Support Window"       value={opp.supportWindow}/>
+              </div>
+
+              {/* Timestamps */}
+              <div className="text-xs text-gray-400 space-y-0.5 pt-1">
+                {opp.created_at && <p>Added: {fmtDate(opp.created_at)}</p>}
+              </div>
+            </div>
+
+            {/* Footer */}
+            {can.edit(role, opp, uid) && (
+              <div className="px-5 py-4 border-t border-gray-100 bg-gray-50">
+                <button onClick={onEdit} className="w-full py-2.5 bg-[#FFDD2F] text-[#1B1B1B] rounded-xl text-sm font-bold hover:bg-[#f5d000] transition-colors">
+                  Edit Opportunity
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // ââ App root ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    function App() {
+      const [session,setSession]   = useState(undefined);
+      const [userRole,setUserRole] = useState(null);
+      const [roleLoad,setRoleLoad] = useState(false);
+      const fetchRole = useCallback(async uid => {
+        setRoleLoad(true);
+        try{ const {data}=await db.from("user_roles").select("role,full_name,email").eq("user_id",uid).single(); setUserRole(data||null); }
+        catch{ setUserRole(null); }
+        setRoleLoad(false);
+      },[]);
+      useEffect(()=>{
+        db.auth.getSession().then(({data:{session:s}})=>{ setSession(s||null); if(s) fetchRole(s.user.id); });
+        const {data:{subscription}}=db.auth.onAuthStateChange((_e,s)=>{ setSession(s||null); if(s) fetchRole(s.user.id); else setUserRole(null); });
+        return ()=>subscription.unsubscribe();
+      },[fetchRole]);
+      if(session===undefined||roleLoad) return <LoadingScreen/>;
+      if(!session)  return <AuthPage/>;
+      if(!userRole) return <NoAccess onOut={()=>db.auth.signOut()} email={session.user.email}/>;
+      return <Dashboard session={session} userRole={userRole}/>;
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+  </script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</body>
+</html>
