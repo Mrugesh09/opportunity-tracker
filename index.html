@@ -22,14 +22,14 @@
 <body>
   <div id="root"></div>
   <script type="text/babel">
-    const { useState, useEffect, useCallback, useMemo, useRef } = React;
+    const { useState, useEffect, useCallback, useMemo } = React;
 
     const SUPA_URL = "https://cwqsrkdqzmdtwhiyshre.supabase.co";
     const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3cXNya2Rxem1kdHdoaXlzaHJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MzE5NTcsImV4cCI6MjA5MDAwNzk1N30.OtoggcPrwOS8dDvWMm4p3wDD10ecHoZ3N2swRIPH0Zc";
     const db = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-    const STAGES      = ["New Lead","Discovery","Scoping","Proposal Sent","Negotiation","Won","Lost","On Hold"];
-    const STAGE_META  = {
+    const STAGES = ["New Lead","Discovery","Scoping","Proposal Sent","Negotiation","Won","Lost","On Hold"];
+    const STAGE_META = {
       "New Lead":      {bg:"bg-gray-100",    text:"text-gray-700",   dot:"bg-gray-400",   border:"border-gray-300"  },
       "Discovery":     {bg:"bg-blue-50",     text:"text-blue-700",   dot:"bg-blue-500",   border:"border-blue-200"  },
       "Scoping":       {bg:"bg-yellow-50",   text:"text-yellow-800", dot:"bg-yellow-500", border:"border-yellow-200"},
@@ -39,87 +39,60 @@
       "Lost":          {bg:"bg-red-50",      text:"text-red-700",    dot:"bg-red-500",    border:"border-red-200"   },
       "On Hold":       {bg:"bg-slate-100",   text:"text-slate-600",  dot:"bg-slate-400",  border:"border-slate-200" },
     };
-    const SOURCES      = ["NBD","Existing Client"];
-    const PLATFORMS    = ["Salesforce Marketing Cloud","Braze","Marketo","HubSpot","Klaviyo","Iterable","Bloomreach","Customer.io","Other"];
-    const ENG_TYPES    = ["Dedicated Resource","Recurring Engagement","Project-to-Project"];
-    const EXPERTISE    = ["Consulting / Strategy","Campaign / Automation Management","Design","Copywriting","Template Production","CRM Migration"];
-    const TIMEZONES    = ["AU","EU","US","Other"];
-    const COPY_OPTS    = ["AI-Driven","AI + Human","Highly Creative"];
-    const EMAIL_OPTS   = ["AI Generated Templates","Drag & Drop Builder","Custom HTML"];
-    const MODAL_TABS   = ["Client","Engagement","Problem","Scope","Decision","Pipeline"];
-    const ROLE_TYPES   = ["Contractual","Full-Time","Part-Time","Freelance"];
-    const URGENCY_OPTS = ["Low","Normal","High","Critical"];
-    const HIRE_STATUS  = ["Open","In Progress","Filled","Cancelled"];
-
-    const ROLE_META = {
-      admin:     {label:"Admin",     bg:"bg-[#1B1B1B]",  text:"text-[#FFDD2F]"},
-      sales:     {label:"Sales",     bg:"bg-blue-600",    text:"text-white"    },
-      growth:    {label:"Growth",    bg:"bg-emerald-600", text:"text-white"    },
-      marketing: {label:"Marketing", bg:"bg-teal-600",    text:"text-white"    },
-      ops:       {label:"Ops",       bg:"bg-violet-600",  text:"text-white"    },
-      ta:        {label:"TA",        bg:"bg-orange-500",  text:"text-white"    },
+    const SOURCES       = ["Inbound","Outbound","Referral","LinkedIn","Event","Partner","Other"];
+    const PLATFORMS     = ["HubSpot","Salesforce Marketing Cloud","Marketo","Pardot","Klaviyo","Braze","Iterable","ActiveCampaign","Mailchimp","Zoho CRM","Other"];
+    const ADD_TOOLS     = ["Segment","CDP","Data Warehouse","BI Tool","Analytics","Custom Dev","API Integration"];
+    const ENG_TYPES     = ["Managed Services","Professional Services","Consulting","Training","Project"];
+    const EXPERTISE     = ["Email Marketing","Marketing Automation","CRM","Analytics","Content","Paid Media","SEO","Web Dev","Martech","Strategy"];
+    const BILLING       = ["Retainer","T&M","Fixed Price"];
+    const TIMEZONES     = ["IST","AEST","GMT","EST","PST","GST"];
+    const COPY_OPTS     = ["Yes","No","Partial"];
+    const EMAIL_OPTS    = ["Yes","No","Partial"];
+    const MODAL_TABS    = ["Contact","Platform","Scope","Commercial","Pipeline"];
+    const ROLE_META     = {
+      admin:  {label:"Admin",  bg:"bg-[#1B1B1B]",   text:"text-[#FFDD2F]"},
+      sales:  {label:"Sales",  bg:"bg-blue-600",     text:"text-white"    },
+      growth: {label:"Growth", bg:"bg-emerald-600",  text:"text-white"    },
+      ops:    {label:"Ops",    bg:"bg-violet-600",   text:"text-white"    },
     };
 
     const can = {
-      create:    r       => ["admin","sales","growth","marketing"].includes(r),
-      edit:      (r,o,u) => r==="admin" || (["sales","growth","marketing"].includes(r) && o?.owner_id===u) || r==="ops",
-      del:       r       => r==="admin",
-      team:      r       => r==="admin",
-      forwardTA: r       => ["admin","sales","growth","marketing"].includes(r),
-  2 };
+      create: (r)       => ["admin","sales","growth"].includes(r),
+      edit:   (r,o,uid) => r==="admin" || (["sales","growth"].includes(r) && o?.owner_id===uid) || r==="ops",
+      del:    (r,o,uid) => r==="admin" || (["sales","growth"].includes(r) && o?.owner_id===uid),
+      team:   (r)       => r==="admin",
+    };
 
-    // ââ Database helpers ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     const dbO = {
-      load: ()     => db.from("opportunities").select("*").order("created_at",{ascending:false}).then(({data,error})=>{ if(error) throw error; return data.map(r=>({id:r.id,created_at:r.created_at,...r.data})); }),
-      add:  data   => db.from("opportunities").insert({data}).select().single().then(({data:r,error})=>{ if(error) throw error; return {id:r.id,created_at:r.created_at,...r.data}; }),
-      upd:  (id,d) => db.from("opportunities").update({data:d}).eq("id",id).then(({error})=>{ if(error) throw error; }),
-      del:  id     => db.from("opportunities").delete().eq("id",id).then(({error})=>{ if(error) throw error; }),
+      load: ()      => db.from("opportunities").select("*").order("created_at",{ascending:false}).then(({data,error})=>{ if(error) throw error; return data.map(r=>({id:r.id,created_at:r.created_at,...r.data})); }),
+      add:  (data)  => db.from("opportunities").insert({data}).select().single().then(({data:r,error})=>{ if(error) throw error; return {id:r.id,created_at:r.created_at,...r.data}; }),
+      upd:  (id,d)  => db.from("opportunities").update({data:d}).eq("id",id).then(({error})=>{ if(error) throw error; }),
+      del:  (id)    => db.from("opportunities").delete().eq("id",id).then(({error})=>{ if(error) throw error; }),
     };
     const dbT = {
-      roles:  ()      => db.from("user_roles").select("*").order("created_at").then(({data,error})=>{ if(error) throw error; return data; }),
-      list:   ()      => db.from("role_allowlist").select("*").order("created_at").then(({data,error})=>{ if(error) throw error; return data; }),
-      add:    (e,r,n) => db.from("role_allowlist").upsert({email:e,role:r,full_name:n},{onConflict:"email"}).then(({error})=>{ if(error) throw error; }),
-      remove: id      => db.from("role_allowlist").delete().eq("id",id).then(({error})=>{ if(error) throw error; }),
-    };
-    const dbH = {
-      load: ()     => db.from("hiring_roles").select("*").order("created_at",{ascending:false}).then(({data,error})=>{ if(error) throw error; return data||[]; }),
-      add:  d      => db.from("hiring_roles").insert(d).select().single().then(({data,error})=>{ if(error) throw error; return data; }),
-      upd:  (id,d) => db.from("hiring_roles").update(d).eq("id",id).then(({error})=>{ if(error) throw error; }),
-    };
-    const dbN = {
-      load: ()        => db.from("notifications").select("*").order("created_at",{ascending:false}).limit(60).then(({data,error})=>{ if(error) throw error; return data||[]; }),
-      add:  d         => db.from("notifications").insert(d).then(({error})=>{ if(error) throw error; }),
-      read: (id,arr)  => db.from("notifications").update({read_by:arr}).eq("id",id).then(()=>{}),
-    };
-    const dbS = {
-      get: k     => db.from("app_settings").select("value").eq("key",k).maybeSingle().then(({data})=>data?.value||""),
-      set: (k,v) => db.from("app_settings").upsert({key:k,value:v,updated_at:new Date().toISOString()},{onConflict:"key"}).then(({error})=>{ if(error) throw error; }),
+      roles:  ()           => db.from("user_roles").select("*").order("created_at").then(({data,error})=>{ if(error) throw error; return data; }),
+      list:   ()           => db.from("role_allowlist").select("*").order("created_at").then(({data,error})=>{ if(error) throw error; return data; }),
+      add:    (e,r,n)      => db.from("role_allowlist").insert({email:e,role:r,full_name:n}).then(({error})=>{ if(error) throw error; }),
+      remove: (id)         => db.from("role_allowlist").delete().eq("id",id).then(({error})=>{ if(error) throw error; }),
     };
 
-    // ââ Utility âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-    const fmtINR  = n => { const v=Number(n)||0; if(v>=10000000) return `\u20B9${(v/10000000).toFixed(1)}Cr`; if(v>=100000) return `\u20B9${(v/100000).toFixed(1)}L`; if(v>=1000) return `\u20B9${(v/1000).toFixed(0)}K`; return `\u20B9${v}`; };
-    const fmtDate = s => s ? new Date(s).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"2-digit"}) : "\u2014";
-    const todayStr = () => new Date().toISOString().slice(0,10);
-    const fireWebhook = async (url, payload) => { if(!url) return; try { await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); } catch {} };
+    const fmtINR = n => { const v=Number(n)||0; if(v>=10000000) return `â¹${(v/10000000).toFixed(1)}Cr`; if(v>=100000) return `â¹${(v/100000).toFixed(1)}L`; if(v>=1000) return `â¹${(v/1000).toFixed(0)}K`; return `â¹${v}`; };
+    const fmtDate = s => s ? new Date(s).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"2-digit"}) : "â";
 
-    // ââ Shared UI âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-    const Spinner      = ({sz="w-6 h-6",c="border-[#FFDD2F]"}) => <div className={`${sz} border-2 ${c} border-t-transparent rounded-full spin`}/>;
-    const StageBadge   = ({stage}) => { const m=STAGE_META[stage]||STAGE_META["New Lead"]; return <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${m.bg} ${m.text} ${m.border}`}><span className={`w-1.5 h-1.5 rounded-full ${m.dot}`}/>{stage||"New Lead"}</span>; };
-    const RoleBadge    = ({role}) => { const m=ROLE_META[role]||{label:role,bg:"bg-gray-200",text:"text-gray-700"}; return <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${m.bg} ${m.text}`}>{m.label}</span>; };
-    const UrgencyBadge = ({urgency}) => { const c={Low:"bg-gray-100 text-gray-600",Normal:"bg-blue-50 text-blue-700",High:"bg-orange-50 text-orange-700",Critical:"bg-red-50 text-red-700"}; return <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c[urgency]||c.Normal}`}>{urgency||"Normal"}</span>; };
-    const HireBadge    = ({status}) => { const c={Open:"bg-green-50 text-green-700","In Progress":"bg-blue-50 text-blue-700",Filled:"bg-gray-100 text-gray-600",Cancelled:"bg-red-50 text-red-600"}; return <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c[status]||c.Open}`}>{status||"Open"}</span>; };
+    const Spinner = ({sz="w-6 h-6",c="border-[#FFDD2F]"}) => <div className={`${sz} border-2 ${c} border-t-transparent rounded-full spin`} />;
+    const StageBadge = ({stage}) => { const m=STAGE_META[stage]||STAGE_META["New Lead"]; return <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${m.bg} ${m.text} ${m.border}`}><span className={`w-1.5 h-1.5 rounded-full ${m.dot}`}/>{stage||"New Lead"}</span>; };
+    const RoleBadge = ({role}) => { const m=ROLE_META[role]||{label:role,bg:"bg-gray-200",text:"text-gray-700"}; return <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${m.bg} ${m.text}`}>{m.label}</span>; };
 
-    const iCls  = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FFDD2F] focus:border-transparent";
-    const dCls  = "disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed";
+    const iCls = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FFDD2F] focus:border-transparent";
+    const dCls = "disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed";
     const FLabel = ({children,req}) => <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">{children}{req&&<span className="text-red-400 ml-0.5">*</span>}</label>;
     const FInput = ({value,onChange,placeholder,type="text",required,disabled}) => <input type={type} value={value||""} onChange={onChange} placeholder={placeholder} required={required} disabled={disabled} className={`${iCls} ${dCls}`}/>;
-    const FSel   = ({value,onChange,options,placeholder,disabled}) => <select value={value||""} onChange={onChange} disabled={disabled} className={`${iCls} bg-white ${dCls}`}><option value="">{placeholder||"Select\u2026"}</option>{options.map(o=><option key={o} value={o}>{o}</option>)}</select>;
-    const FTxt   = ({value,onChange,placeholder,rows=3,disabled}) => <textarea value={value||""} onChange={onChange} placeholder={placeholder} rows={rows} disabled={disabled} className={`${iCls} resize-none ${dCls}`}/>;
-    const Tog    = ({options,value,onChange,disabled}) => <div className="flex flex-wrap gap-1.5">{options.map(o=><button key={o} type="button" onClick={()=>!disabled&&onChange(o)} disabled={disabled} className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${value===o?"bg-[#1B1B1B] text-[#FFDD2F] border-[#1B1B1B]":"bg-white text-gray-600 border-gray-200 hover:border-gray-400"} disabled:opacity-40`}>{o}</button>)}</div>;
-    const MTog   = ({options,values=[],onChange,disabled}) => <div className="flex flex-wrap gap-1.5">{options.map(o=>{ const s=values.includes(o); return <button key={o} type="button" onClick={()=>!disabled&&onChange(s?values.filter(v=>v!==o):[...values,o])} disabled={disabled} className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${s?"bg-[#FFDD2F] text-[#1B1B1B] border-[#FFDD2F]":"bg-white text-gray-600 border-gray-200 hover:border-gray-400"} disabled:opacity-40`}>{o}</button>; })}</div>;
-    const FSec   = ({title,children}) => <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4"><p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{title}</p>{children}</div>;
+    const FSel = ({value,onChange,options,placeholder,disabled}) => <select value={value||""} onChange={onChange} disabled={disabled} className={`${iCls} bg-white ${dCls}`}><option value="">{placeholder||"Selectâ¦"}</option>{options.map(o=><option key={o} value={o}>{o}</option>)}</select>;
+    const FTxt = ({value,onChange,placeholder,rows=3,disabled}) => <textarea value={value||""} onChange={onChange} placeholder={placeholder} rows={rows} disabled={disabled} className={`${iCls} resize-none ${dCls}`}/>;
+    const Tog = ({options,value,onChange,disabled}) => <div className="flex flex-wrap gap-1.5">{options.map(o=><button key={o} type="button" onClick={()=>!disabled&&onChange(o)} disabled={disabled} className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${value===o?"bg-[#1B1B1B] text-[#FFDD2F] border-[#1B1B1B]":"bg-white text-gray-600 border-gray-200 hover:border-gray-400"} disabled:opacity-40`}>{o}</button>)}</div>;
+    const MTog = ({options,values=[],onChange,disabled}) => <div className="flex flex-wrap gap-1.5">{options.map(o=>{ const s=values.includes(o); return <button key={o} type="button" onClick={()=>!disabled&&onChange(s?values.filter(v=>v!==o):[...values,o])} disabled={disabled} className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${s?"bg-[#FFDD2F] text-[#1B1B1B] border-[#FFDD2F]":"bg-white text-gray-600 border-gray-200 hover:border-gray-400"} disabled:opacity-40`}>{o}</button>; })}</div>;
+    const FSec = ({title,children}) => <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4"><p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{title}</p>{children}</div>;
 
-    // ââ Auth screens ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     const LoadingScreen = () => (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#1B1B1B]">
         <img src="https://www.mavlers.com/images/MavlersLogo.svg" alt="Mavlers" className="h-9 mb-8 brightness-0 invert"/>
@@ -131,7 +104,7 @@
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#1B1B1B] px-4">
         <img src="https://www.mavlers.com/images/MavlersLogo.svg" alt="Mavlers" className="h-9 mb-8 brightness-0 invert"/>
         <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
-          <div className="text-5xl mb-4">&#128274;</div>
+          <div className="text-5xl mb-4">ð</div>
           <h2 className="text-lg font-bold text-[#1B1B1B] mb-2">Access Not Granted</h2>
           <p className="text-sm text-gray-500 mb-1 font-semibold">{email}</p>
           <p className="text-xs text-gray-400 mb-6">is not on the access list. Contact your admin.</p>
@@ -141,29 +114,29 @@
     );
 
     const AuthPage = () => {
-      const [tab,setTab]     = useState("login");
+      const [tab,setTab]   = useState("login");
       const [email,setEmail] = useState("");
-      const [pass,setPass]   = useState("");
-      const [busy,setBusy]   = useState(false);
-      const [err,setErr]     = useState("");
-      const [ok,setOk]       = useState("");
+      const [pass,setPass] = useState("");
+      const [busy,setBusy] = useState(false);
+      const [err,setErr]   = useState("");
+      const [ok,setOk]     = useState("");
       const sw = t => { setTab(t); setErr(""); setOk(""); };
       const go = async e => {
         e.preventDefault(); setErr(""); setOk(""); setBusy(true);
         try {
           if(tab==="forgot") {
-            const {error}=await db.auth.resetPasswordForEmail(email.trim(),{redirectTo:window.location.href});
+            const {error} = await db.auth.resetPasswordForEmail(email.trim(),{redirectTo:window.location.href});
             if(error) throw error;
             setOk("Reset link sent! Check your inbox.");
           } else if(tab==="login") {
-            const {error}=await db.auth.signInWithPassword({email:email.trim(),password:pass});
+            const {error} = await db.auth.signInWithPassword({email:email.trim(),password:pass});
             if(error) throw error;
           } else {
-            const {error}=await db.auth.signUp({email:email.trim(),password:pass,options:{emailRedirectTo:window.location.href}});
+            const {error} = await db.auth.signUp({email:email.trim(),password:pass,options:{emailRedirectTo:window.location.href}});
             if(error) throw error;
             setOk("Account created! You can now sign in."); sw("login");
           }
-        } catch(er){ setErr(er.message||"Something went wrong."); }
+        } catch(er) { setErr(er.message||"Something went wrong."); }
         setBusy(false);
       };
       return (
@@ -183,15 +156,23 @@
               )}
               <form onSubmit={go} className="p-6 space-y-4">
                 {tab==="forgot" && <div className="text-center pb-1"><p className="font-bold text-[#1B1B1B]">Reset Password</p><p className="text-xs text-gray-400 mt-1">We'll email you a reset link.</p></div>}
-                <div><FLabel req>Email</FLabel><FInput type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@mavlers.com" required/></div>
-                {tab!=="forgot" && <div><FLabel req>Password</FLabel><FInput type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" required/></div>}
+                <div>
+                  <FLabel req>Email</FLabel>
+                  <FInput type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@mavlers.com" required/>
+                </div>
+                {tab!=="forgot" && (
+                  <div>
+                    <FLabel req>Password</FLabel>
+                    <FInput type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="â¢â¢â¢â¢â¢â¢â¢â¢" required/>
+                  </div>
+                )}
                 {err && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 border border-red-100">{err}</p>}
                 {ok  && <p className="text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2 border border-green-100">{ok}</p>}
                 <button type="submit" disabled={busy} className="w-full py-3 rounded-xl text-sm font-bold bg-[#FFDD2F] text-[#1B1B1B] hover:bg-[#f5d000] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
-                  {busy?<><Spinner sz="w-4 h-4" c="border-[#1B1B1B]"/>Please wait&#8230;</>:tab==="login"?"Sign In \u2192":tab==="signup"?"Create Account":"Send Reset Link"}
+                  {busy ? <><Spinner sz="w-4 h-4" c="border-[#1B1B1B]"/>Please waitâ¦</> : tab==="login"?"Sign In â":tab==="signup"?"Create Account":"Send Reset Link"}
                 </button>
                 {tab==="login"  && <button type="button" onClick={()=>sw("forgot")} className="w-full text-xs text-gray-400 hover:text-[#1B1B1B] text-center">Forgot password?</button>}
-                {tab==="forgot" && <button type="button" onClick={()=>sw("login")}  className="w-full text-xs text-gray-400 hover:text-[#1B1B1B] text-center">\u2190 Back to Sign In</button>}
+                {tab==="forgot" && <button type="button" onClick={()=>sw("login")}  className="w-full text-xs text-gray-400 hover:text-[#1B1B1B] text-center">â Back to Sign In</button>}
               </form>
             </div>
             <p className="text-center text-xs text-gray-500 mt-5">Only authorized Mavlers team members can access this tool.</p>
@@ -200,7 +181,6 @@
       );
     };
 
-    // ââ Stat card âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     const StatCard = ({label,value,sub,hi}) => (
       <div className={`bg-white rounded-xl p-4 shadow-sm border hover:shadow-md transition-shadow ${hi?"border-[#FFDD2F] border-2":"border-gray-100"}`}>
         <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{label}</p>
@@ -209,109 +189,97 @@
       </div>
     );
 
-    // ââ Blank form ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-    const blankForm = () => ({
-      clientName:"",industry:"",clientSize:"",website:"",source:"",
-      pocName:"",pocTitle:"",pocEmail:"",pocPhone:"",
-      opportunityOwner:"",assignedToSales:"",
-      opportunityCreationDate:todayStr(),
-      engagementType:"",expertiseNeeded:[],expertiseOther:"",
-      problemStatement:"",successDefinition:"",
-      platforms:[],
-      discoveryCallUrl:"",onboardingCallUrl:"",
-      scopeOfWork:"",copywritingRequirement:"",emailProductionRequirement:"",
-      budgetRange:"",estimatedHours:"",potentialMonthlyRevenue:"",
-      projectCost:"",projectTimeline:"",
-      clientTimezone:"",supportWindow:"",
-      stage:"New Lead",salesNotes:"",debriefNotes:"",additionalNotes:""
-    });
+    const blankForm = () => ({clientName:"",industry:"",clientSize:"",website:"",source:"",pocName:"",pocEmail:"",pocPhone:"",opportunityOwner:"",assignedToSales:"",opportunityCreationDate:"",primaryPlatform:"",additionalTools:[],problemStatement:"",engagementType:"",expertiseNeeded:[],scopeOfWork:"",campaignsPerMonth:"",templatesPerMonth:"",automationsRequired:"",copywritingRequirement:"",emailProductionRequirement:"",estimatedHours:"",potentialMonthlyRevenue:"",billingModel:"",clientTimezone:"",supportWindow:"",stage:"New Lead",salesNotes:"",debriefNotes:""});
 
-    // ââ Opportunity modal âââââââââââââââââââââââââââââââââââââââââââââââââââââ
     const OppModal = ({editData,userId,role,onClose,onSaved}) => {
-      const ops    = role==="ops";
+      const ops = role==="ops";
       const isEdit = !!editData;
-      const init   = isEdit ? {...blankForm(),...editData,platforms:editData.platforms||(editData.primaryPlatform?[editData.primaryPlatform]:[]),expertiseOther:editData.expertiseOther||""} : blankForm();
-      const [form,setForm] = useState(init);
-      const [tab,setTab]   = useState(ops?5:0);
+      const [form,setForm] = useState(editData?{...editData}:blankForm());
+      const [tab,setTab]   = useState(ops?4:0);
       const [busy,setBusy] = useState(false);
       const [err,setErr]   = useState("");
       const f  = k => e => setForm(p=>({...p,[k]:e.target.value}));
       const fv = k => v => setForm(p=>({...p,[k]:v}));
-      const hasCopy = (form.expertiseNeeded||[]).includes("Copywriting");
-      const hasEml  = (form.expertiseNeeded||[]).includes("Template Production");
-      const isP2P   = form.engagementType==="Project-to-Project";
       const save = async () => {
         if(!ops&&!form.clientName){ setErr("Client name is required."); setTab(0); return; }
         setBusy(true); setErr("");
         try {
-          const pl={...form,primaryPlatform:(form.platforms||[])[0]||"",owner_id:isEdit?(editData.owner_id||userId):userId};
-          if(isEdit){ await dbO.upd(editData.id,pl); try{onSaved({id:editData.id,created_at:editData.created_at,...pl});}catch(se){console.error(se);} }
-          else { const c=await dbO.add(pl); try{onSaved(c);}catch(se){console.error(se);} }
+          const payload = {...form,owner_id:isEdit?(editData.owner_id||userId):userId};
+          if(isEdit){ await dbO.upd(editData.id,payload); onSaved({id:editData.id,created_at:editData.created_at,...payload}); }
+          else { const c=await dbO.add(payload); onSaved(c); }
           onClose();
         } catch(er){ setErr(er.message||"Save failed."); setBusy(false); }
       };
-      const tabs=[
+      const tabs = [
         <div key="c" className="space-y-4">
-          <FSec title="Client Info"><div className="grid grid-cols-2 gap-3">
-    0       <div className="col-span-2"><FLabel req={!ops}>Client / Company Name</FLabel><FInput value={form.clientName} onChange={f("clientName")} placeholder="e.g. Acme Corp" required={!ops} disabled={ops}/></div>
-            <div><FLabel>Domain / Industry</FLabel><FInput value={form.industry} onChange={f("industry")} placeholder="e.g. E-commerce, Fintech" disabled={ops}/></div>
-            <div><FLabel>Company Size</FLabel><FSel value={form.clientSize} onChange={f("clientSize")} options={["SMB","Mid-Market","Enterprise"]} disabled={ops}/></div>
-            <div><FLabel>Website</FLabel><FInput value={form.website} onChange={f("website")} placeholder="https://" disabled={ops}/></div>
-            <div><FLabel>Source</FLabel><FSel value={form.source} onChange={f("source")} options={SOURCES} placeholder="Select source" disabled={ops}/></div>
-          </div></FSec>
-          <FSec title="Point of Contact"><div className="grid grid-cols-2 gap-3">
-            <div><FLabel>POC Name</FLabel><FInput value={form.pocName} onChange={f("pocName")} placeholder="e.g. Jane Doe" disabled={ops}/></div>
-            <div><FLabel>POC Title</FLabel><FInput value={form.pocTitle} onChange={f("pocTitle")} placeholder="e.g. Head of Marketing" disabled={ops}/></div>
-            <div><FLabel>POC Email</FLabel><FInput type="email" value={form.pocEmail} onChange={f("pocEmail")} placeholder="jane@company.com" disabled={ops}/></div>
-            <div><FLabel>POC Phone</FLabel><FInput value={form.pocPhone} onChange={f("pocPhone")} placeholder="+91 \u2026" disabled={ops}/></div>
-            <div><FLabel>Opportunity Owner (CSM)</FLabel><FInput value={form.opportunityOwner} onChange={f("opportunityOwner")} placeholder="e.g. Rahul Mehta" disabled={ops}/></div>
-            <div><FLabel>Assigned Sales</FLabel><FInput value={form.assignedToSales} onChange={f("assignedToSales")} placeholder="e.g. Anita Sharma" disabled={ops}/></div>
-            <div><FLabel>Created Date</FLabel><FInput type="date" value={form.opportunityCreationDate} onChange={f("opportunityCreationDate")} disabled={ops}/></div>
-          </div></FSec>
-        </div>,
-        <div key="e" className="space-y-4">
-          <FSec title="Engagement Type"><p className="text-xs text-gray-400 mb-3">Select ONE.</p><Tog options={ENG_TYPES} value={form.engagementType} onChange={fv("engagementType")} disabled={ops}/></FSec>
-          <FSec title="Expertise Needed"><p className="text-xs text-gray-400 mb-3">Select ALL that apply.</p><MTog options={EXPERTISE} values={form.expertiseNeeded} onChange={fv("expertiseNeeded")} disabled={ops}/><div className="mt-3"><FLabel>Other (specify)</FLabel><FInput value={form.expertiseOther} onChange={f("expertiseOther")} placeholder="Describe any additional expertise needed\u2026" disabled={ops}/></div></FSec>
-        </div>,
-        <div key="p" className="space-y-4">
-          <FSec title="Problem Statement"><p className="text-xs text-gray-400 mb-3">Answer both questions.</p><div className="space-y-3">
-            <div><FLabel>What challenge or gap is the client trying to solve?</FLabel><FTxt value={form.problemStatement} onChange={f("problemStatement")} rows={4} placeholder="e.g. Client has no in-house expertise\u2026" disabled={ops}/></div>
-            <div><FLabel>What does success look like to the client?</FLabel><FTxt value={form.successDefinition} onChange={f("successDefinition")} rows={4} placeholder="e.g. Fully configured Braze instance\u2026" disabled={ops}/></div>
-          </div></FSec>
-        </div>,
-        <div key="s" className="space-y-4">
-          <FSec title="Platform & Technology"><p className="text-xs text-gray-400 mb-2">Select all platforms in scope.</p><MTog options={PLATFORMS} values={form.platforms||[]} onChange={fv("platforms")} disabled={ops}/></FSec>
-          <FSec title="Call Recordings"><div className="grid grid-cols-1 gap-3">
-            <div><FLabel>Discovery Call Recording URL</FLabel><FInput value={form.discoveryCallUrl} onChange={f("discoveryCallUrl")} placeholder="https://drive.google.com/\u2026" disabled={ops}/></div>
-            <div><FLabel>Onboarding Call Recording URL</FLabel><FInput value={form.onboardingCallUrl} onChange={f("onboardingCallUrl")} placeholder="https://drive.google.com/\u2026" disabled={ops}/></div>
-          </div></FSec>
-          <FSec title="Scope of Work"><FTxt value={form.scopeOfWork} onChange={f("scopeOfWork")} placeholder="List what Mavlers will own vs. what the client handles." rows={4} disabled={ops}/></FSec>
-          {hasCopy && <FSec title="Copywriting Requirement"><p className="text-xs text-gray-400 mb-3">Select ONE.</p><Tog options={COPY_OPTS} value={form.copywritingRequirement} onChange={fv("copywritingRequirement")} disabled={ops}/></FSec>}
-          {hasEml  && <FSec title="Email Production Requirement"><p className="text-xs text-gray-400 mb-3">Select ONE.</p><Tog options={EMAIL_OPTS} value={form.emailProductionRequirement} onChange={fv("emailProductionRequirement")} disabled={ops}/></FSec>}
-        </div>,
-        <div key="d" className="space-y-4">
-          <FSec title="Budget"><div><FLabel>Budget Range (if shared)</FLabel><FInput value={form.budgetRange} onChange={f("budgetRange")} placeholder="e.g. \u20B95\u20138L / month" disabled={ops}/></div></FSec>
-          <FSec title="Commercial Details">
-            {isP2P ? <div className="grid grid-cols-2 gap-3">
-              <div><FLabel>Project Cost (\u20B9)</FLabel><FInput type="number" value={form.projectCost} onChange={f("projectCost")} placeholder="e.g. 500000" disabled={ops}/></div>
-              <div><FLabel>Project Timeline</FLabel><FInput value={form.projectTimeline} onChange={f("projectTimeline")} placeholder="e.g. 6 weeks" disabled={ops}/></div>
-            </div> : <div className="grid grid-cols-2 gap-3">
-              <div><FLabel>Est. Hours / Month</FLabel><FInput type="number" value={form.estimatedHours} onChange={f("estimatedHours")} placeholder="e.g. 80" disabled={ops}/></div>
-              <div><FLabel>Potential Monthly Revenue (\u20B9)</FLabel><FInput type="number" value={form.potentialMonthlyRevenue} onChange={f("potentialMonthlyRevenue")} placeholder="e.g. 120000" disabled={ops}/></div>
-            </div>}
-            <div className="mt-3"><FLabel>Client Timezone</FLabel><Tog options={TIMEZONES} value={form.clientTimezone} onChange={fv("clientTimezone")} disabled={ops}/></div>
-            <div className="mt-3"><FLabel>Support Window</FLabel><FInput value={form.supportWindow} onChange={f("supportWindow")} placeholder="e.g. 9 AM \u2013 5 PM AEST, Mon\u2013Fri" disabled={ops}/></div>
+          <FSec title="Client Info">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2"><FLabel req={!ops}>Client / Company Name</FLabel><FInput value={form.clientName} onChange={f("clientName")} placeholder="Acme Corp" required={!ops} disabled={ops}/></div>
+              <div><FLabel>Industry</FLabel><FInput value={form.industry} onChange={f("industry")} placeholder="E-commerce" disabled={ops}/></div>
+              <div><FLabel>Size</FLabel><FSel value={form.clientSize} onChange={f("clientSize")} options={["SMB","Mid-Market","Enterprise"]} disabled={ops}/></div>
+              <div className="col-span-2"><FLabel>Website</FLabel><FInput value={form.website} onChange={f("website")} placeholder="https://" disabled={ops}/></div>
+              <div className="col-span-2"><FLabel>Source</FLabel><FSel value={form.source} onChange={f("source")} options={SOURCES} placeholder="Select source" disabled={ops}/></div>
+            </div>
+          </FSec>
+          <FSec title="Point of Contact">
+            <div className="grid grid-cols-2 gap-3">
+              <div><FLabel>POC Name</FLabel><FInput value={form.pocName} onChange={f("pocName")} placeholder="Full name" disabled={ops}/></div>
+              <div><FLabel>POC Email</FLabel><FInput type="email" value={form.pocEmail} onChange={f("pocEmail")} placeholder="poc@company.com" disabled={ops}/></div>
+              <div><FLabel>POC Phone</FLabel><FInput value={form.pocPhone} onChange={f("pocPhone")} placeholder="+91 â¦" disabled={ops}/></div>
+              <div><FLabel>Opp Owner (CSM)</FLabel><FInput value={form.opportunityOwner} onChange={f("opportunityOwner")} placeholder="Ravi (CSM)" disabled={ops}/></div>
+              <div><FLabel>Assigned Sales</FLabel><FInput value={form.assignedToSales} onChange={f("assignedToSales")} placeholder="Anita (Sales)" disabled={ops}/></div>
+              <div><FLabel>Created Date</FLabel><FInput type="date" value={form.opportunityCreationDate} onChange={f("opportunityCreationDate")} disabled={ops}/></div>
+            </div>
           </FSec>
         </div>,
-        <div key="pp" className="space-y-4">
-          <FSec title="Pipeline Stage"><div className="grid grid-cols-2 gap-2">
-            {STAGES.map(s=>{ const m=STAGE_META[s]; const a=form.stage===s; return <button key={s} type="button" onClick={()=>setForm(p=>({...p,stage:s}))} className={`text-xs px-3 py-2.5 rounded-xl border text-left flex items-center gap-2 font-semibold transition-all ${a?`${m.bg} ${m.text} ${m.border} shadow-sm`:"bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}><span className={`w-2 h-2 rounded-full flex-shrink-0 ${m.dot}`}/>{s}</button>; })}
-          </div></FSec>
-          <FSec title="Notes"><div className="space-y-3">
-            <div><FLabel>Sales Notes</FLabel><FTxt value={form.salesNotes} onChange={f("salesNotes")} placeholder="Context and next steps for the Sales team\u2026" rows={3}/></div>
-            <div><FLabel>Ops Debrief Notes</FLabel><FTxt value={form.debriefNotes} onChange={f("debriefNotes")} placeholder="Post-closure debrief for the Ops team\u2026" rows={3}/></div>
-            <div><FLabel>Additional Notes</FLabel><FTxt value={form.additionalNotes} onChange={f("additionalNotes")} placeholder="Any other context\u2026" rows={3}/></div>
-          </div></FSec>
+        <div key="p" className="space-y-4">
+          <FSec title="Platform & Technology">
+            <div className="mb-3"><FLabel>Primary CRM / MAP</FLabel><FSel value={form.primaryPlatform} onChange={f("primaryPlatform")} options={PLATFORMS} placeholder="Select platform" disabled={ops}/></div>
+            <div><FLabel>Additional Tools</FLabel><MTog options={ADD_TOOLS} values={form.additionalTools} onChange={fv("additionalTools")} disabled={ops}/></div>
+          </FSec>
+          <FSec title="Problem Statement"><FTxt value={form.problemStatement} onChange={f("problemStatement")} rows={4} placeholder={"What the client needs\nWhy they need it\nExpected outcome"} disabled={ops}/></FSec>
+        </div>,
+        <div key="s" className="space-y-4">
+          <FSec title="Engagement">
+            <div className="mb-3"><FLabel>Engagement Type</FLabel><Tog options={ENG_TYPES} value={form.engagementType} onChange={fv("engagementType")} disabled={ops}/></div>
+            <div><FLabel>Expertise Needed</FLabel><MTog options={EXPERTISE} values={form.expertiseNeeded} onChange={fv("expertiseNeeded")} disabled={ops}/></div>
+          </FSec>
+          <FSec title="Scope of Work"><FTxt value={form.scopeOfWork} onChange={f("scopeOfWork")} placeholder="Deliverables, responsibilities, timelineâ¦" rows={3} disabled={ops}/></FSec>
+          <FSec title="Volume & Production">
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <div><FLabel>Campaigns/Mo</FLabel><FInput type="number" value={form.campaignsPerMonth} onChange={f("campaignsPerMonth")} placeholder="8" disabled={ops}/></div>
+              <div><FLabel>Templates/Mo</FLabel><FInput type="number" value={form.templatesPerMonth} onChange={f("templatesPerMonth")} placeholder="12" disabled={ops}/></div>
+              <div><FLabel>Automations</FLabel><FInput type="number" value={form.automationsRequired} onChange={f("automationsRequired")} placeholder="5" disabled={ops}/></div>
+            </div>
+            <div className="mb-3"><FLabel>Copywriting</FLabel><Tog options={COPY_OPTS} value={form.copywritingRequirement} onChange={fv("copywritingRequirement")} disabled={ops}/></div>
+            <div><FLabel>Email Production</FLabel><Tog options={EMAIL_OPTS} value={form.emailProductionRequirement} onChange={fv("emailProductionRequirement")} disabled={ops}/></div>
+          </FSec>
+        </div>,
+        <div key="com" className="space-y-4">
+          <FSec title="Revenue & Billing">
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div><FLabel>Est. Hours/Month</FLabel><FInput type="number" value={form.estimatedHours} onChange={f("estimatedHours")} placeholder="80" disabled={ops}/></div>
+              <div><FLabel>Monthly Revenue (â¹)</FLabel><FInput type="number" value={form.potentialMonthlyRevenue} onChange={f("potentialMonthlyRevenue")} placeholder="120000" disabled={ops}/></div>
+            </div>
+            <div><FLabel>Billing Model</FLabel><Tog options={BILLING} value={form.billingModel} onChange={fv("billingModel")} disabled={ops}/></div>
+          </FSec>
+          <FSec title="Timezone & Support">
+            <div className="mb-3"><FLabel>Client Timezone</FLabel><Tog options={TIMEZONES} value={form.clientTimezone} onChange={fv("clientTimezone")} disabled={ops}/></div>
+            <div><FLabel>Support Window</FLabel><FInput value={form.supportWindow} onChange={f("supportWindow")} placeholder="9 AM â 5 PM AEST" disabled={ops}/></div>
+          </FSec>
+        </div>,
+        <div key="pip" className="space-y-4">
+          <FSec title="Pipeline Stage">
+            <div className="grid grid-cols-2 gap-2">
+              {STAGES.map(s=>{ const m=STAGE_META[s]; const a=form.stage===s; return <button key={s} type="button" onClick={()=>setForm(p=>({...p,stage:s}))} className={`text-xs px-3 py-2.5 rounded-xl border text-left flex items-center gap-2 font-semibold transition-all ${a?`${m.bg} ${m.text} ${m.border} shadow-sm`:"bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}><span className={`w-2 h-2 rounded-full flex-shrink-0 ${m.dot}`}/>{s}</button>; })}
+            </div>
+          </FSec>
+          <FSec title="Notes">
+            <div className="space-y-3">
+              <div><FLabel>Sales Notes</FLabel><FTxt value={form.salesNotes} onChange={f("salesNotes")} placeholder="Notes for the Sales teamâ¦" rows={3}/></div>
+              <div><FLabel>Ops Debrief Notes</FLabel><FTxt value={form.debriefNotes} onChange={f("debriefNotes")} placeholder="Post-closure debrief for Opsâ¦" rows={3}/></div>
+            </div>
+          </FSec>
         </div>,
       ];
       return (
@@ -322,18 +290,22 @@
                 <h2 className="text-sm font-bold text-white">{ops?"Update Stage & Notes":isEdit?"Edit Opportunity":"Add New Opportunity"}</h2>
                 {!ops && <p className="text-xs text-gray-400 mt-0.5">Step {tab+1}/{MODAL_TABS.length}: {MODAL_TABS[tab]}</p>}
               </div>
-              <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white text-xl leading-none transition-colors">&times;</button>
+              <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white text-xl leading-none transition-colors">Ã</button>
             </div>
-            {!ops && <div className="flex border-b border-gray-100 bg-gray-50 px-1 overflow-x-auto">{MODAL_TABS.map((t,i)=><button key={t} onClick={()=>setTab(i)} className={`px-4 py-2.5 text-xs font-bold whitespace-nowrap transition-colors flex-shrink-0 ${tab===i?"text-[#1B1B1B] border-b-2 border-[#FFDD2F]":"text-gray-400 hover:text-gray-600"}`}>{t}</button>)}</div>}
+            {!ops && (
+              <div className="flex border-b border-gray-100 bg-gray-50 px-1 overflow-x-auto">
+                {MODAL_TABS.map((t,i)=><button key={t} onClick={()=>setTab(i)} className={`px-4 py-2.5 text-xs font-bold whitespace-nowrap transition-colors flex-shrink-0 ${tab===i?"text-[#1B1B1B] border-b-2 border-[#FFDD2F]":"text-gray-400 hover:text-gray-600"}`}>{t}</button>)}
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto p-4">{tabs[tab]}</div>
             {err && <p className="text-xs text-red-600 bg-red-50 px-5 py-2 border-t border-red-100">{err}</p>}
             <div className="flex gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50">
               <button onClick={onClose} className="py-2.5 px-4 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-white transition-colors">Cancel</button>
-              {!ops && tab>0 && <button type="button" onClick={()=>setTab(t=>t-1)} className="py-2.5 px-4 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-white transition-colors">\u2190 Back</button>}
+              {!ops && tab>0 && <button type="button" onClick={()=>setTab(t=>t-1)} className="py-2.5 px-4 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-white transition-colors">â Back</button>}
               <div className="flex-1"/>
               {!ops && tab<MODAL_TABS.length-1
-                ? <button type="button" onClick={()=>setTab(t=>t+1)} className="py-2.5 px-5 bg-[#FFDD2F] text-[#1B1B1B] rounded-xl text-sm font-bold hover:bg-[#f5d000] transition-colors">Next \u2192</button>
-                : <button type="button" onClick={save} disabled={busy} className="py-2.5 px-5 bg-[#1B1B1B] text-[#FFDD2F] rounded-xl text-sm font-bold hover:bg-black disabled:opacity-60 flex items-center gap-2 transition-colors">{busy?<><Spinner sz="w-4 h-4"/>Saving\u2026</>:isEdit?"Save Changes":"Add Opportunity"}</button>
+                ? <button type="button" onClick={()=>setTab(t=>t+1)} className="py-2.5 px-5 bg-[#FFDD2F] text-[#1B1B1B] rounded-xl text-sm font-bold hover:bg-[#f5d000] transition-colors">Next â</button>
+                : <button type="button" onClick={save} disabled={busy} className="py-2.5 px-5 bg-[#1B1B1B] text-[#FFDD2F] rounded-xl text-sm font-bold hover:bg-black disabled:opacity-60 flex items-center gap-2 transition-colors">{busy?<><Spinner sz="w-4 h-4"/>Savingâ¦</>:isEdit?"Save Changes":"Add Opportunity"}</button>
               }
             </div>
           </div>
@@ -341,278 +313,24 @@
       );
     };
 
-    // ââ Stage dropdown ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-    const StageDropdown = ({currentStage,onSelect,onClose}) => {
-      const ref = useRef(null);
-      useEffect(()=>{ const h=e=>{ if(ref.current&&!ref.current.contains(e.target)) onClose(); }; document.addEventListener("mousedown",h); return ()=>document.removeEventListener("mousedown",h); },[onClose]);
-      return (
-        <div ref={ref} className="absolute z-50 top-full left-0 mt-1 bg-white rounded-xl border border-gray-200 shadow-xl py-1 min-w-[160px]">
-          <p className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">Change Stage</p>
-          {STAGES.map(s=>{ const m=STAGE_META[s]; const active=s===currentStage; return (
-            <button key={s} onClick={()=>onSelect(s)} className={`w-full text-left px-3 py-1.5 text-xs font-semibold flex items-center gap-2 transition-colors ${active?"bg-[#FFFBEA] text-[#1B1B1B]":"text-gray-600 hover:bg-gray-50"}`}>
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${m.dot}`}/>{s}
-              {active && <span className="ml-auto text-[#FFDD2F]">&#10003;</span>}
-            </button>
-          ); })}
-        </div>
-      );
-    };
-
-    // ââ Notification Bell âââââââââââââââââââââââââââââââââââââââââââââââââââââ
-    const NotificationBell = ({userId}) => {
-      const [notifs,setNotifs] = useState([]);
-      const [open,setOpen]     = useState(false);
-      const ref                = useRef(null);
-      const load = useCallback(async()=>{ try{ const d=await dbN.load(); setNotifs(d); }catch{} },[]);
-      useEffect(()=>{ load(); },[load]);
-      useEffect(()=>{ const h=e=>{ if(ref.current&&!ref.current.contains(e.target)) setOpen(false); }; document.addEventListener("mousedown",h); return()=>document.removeEventListener("mousedown",h); },[]);
-      const unread = notifs.filter(n=>!(n.read_by||[]).includes(userId)).length;
-      const markAllRead = async() => {
-        const unreadItems = notifs.filter(n=>!(n.read_by||[]).includes(userId));
-        for(const n of unreadItems){ const arr=[...(n.read_by||[]),userId]; await dbN.read(n.id,arr); }
-        setNotifs(prev=>prev.map(n=>{ const arr=[...(n.read_by||[])]; if(!arr.includes(userId)) arr.push(userId); return {...n,read_by:arr}; }));
-      };
-      const icon = t => t==="opp_won"?"&#127942;":t==="opp_added"?"&#10024;":t==="hiring_forwarded"?"&#127919;":"&#128260;";
-      return (
-        <div ref={ref} className="relative">
-          <button onClick={()=>{ setOpen(o=>{ if(!o) markAllRead(); return !o; })} } className="relative w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors text-lg">
-            &#128276;
-            {unread>0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#FFDD2F] text-[#1B1B1B] text-[9px] font-extrabold rounded-full flex items-center justify-center">{unread>9?"9+":unread}</span>}
-          </button>
-          {open && (
-            <div className="absolute right-0 top-10 w-80 bg-white rounded-2xl border border-gray-100 shadow-2xl overflow-hidden z-50">
-              <div className="px-4 py-3 bg-[#1B1B1B] flex items-center justify-between">
-                <p className="text-xs font-bold text-white">Notifications</p>
-                <button onClick={load} className="text-xs text-gray-400 hover:text-[#FFDD2F] transition-colors">&#8635; Refresh</button>
-              </div>
-              {notifs.length===0
-                ? <p className="text-xs text-gray-400 text-center py-8">No notifications yet</p>
-                : <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
-                    {notifs.map(n=>{ const read=(n.read_by||[]).includes(userId); return (
-                      <div key={n.id} className={`px-4 py-3 ${read?"":"bg-[#FFFBEA]"}`}>
-                        <div className="flex items-start gap-2">
-                          <span className="text-base flex-shrink-0 mt-0.5" dangerouslySetInnerHTML={{__html:icon(n.type)}}/>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-xs leading-snug ${read?"text-gray-500":"text-gray-800 font-semibold"}`}>{n.message}</p>
-                            <p className="text-[10px] text-gray-400 mt-1">{fmtDate(n.created_at)}</p>
-                          </div>
-                          {!read && <div className="w-2 h-2 bg-[#FFDD2F] rounded-full flex-shrink-0 mt-1"/>}
-                        </div>
-                      </div>
-                    ); })}
-                  </div>
-              }
-            </div>
-          )}
-        </div>
-      );
-    };
-
-    // ââ Forward to TA modal âââââââââââââââââââââââââââââââââââââââââââââââââââ
-    const ForwardToTAModal = ({opp,userEmail,userName,onClose,onForwarded}) => {
-      const [form,setForm] = useState({role_title:"",role_type:"Contractual",skills_required:"",experience_required:"",start_date:"",deadline:"",hiring_budget_inr:"",urgency:"Normal",notes:""});
-      const [busy,setBusy] = useState(false);
-      const [err,setErr]   = useState("");
-      const f  = k => e => setForm(p=>({...p,[k]:e.target.value}));
-      const submit = async e => {
-        e.preventDefault();
-        if(!form.role_title){ setErr("Role title is required."); return; }
-        setBusy(true); setErr("");
-        try {
-          await dbH.add({
-            opportunity_id:opp.id, opp_client_name:opp.clientName||"Unnamed",
-            role_title:form.role_title, role_type:form.role_type||"Contractual",
-            skills_required:form.skills_required, experience_required:form.experience_required,
-            start_date:form.start_date||null, deadline:form.deadline||null,
-            hiring_budget_inr:Number(form.hiring_budget_inr)||null,
-            urgency:form.urgency||"Normal", notes:form.notes,
-            forwarded_by_email:userEmail, forwarded_by_name:userName, status:"Open",
-          });
-          await dbN.add({
-            type:"hiring_forwarded",
-            message:`\u{1F3AF} "${opp.clientName||"Unnamed"}" forwarded to TA \u2014 Role: ${form.role_title} (${form.role_type||"Contractual"}) | Urgency: ${form.urgency||"Normal"}`,
-            opportunity_id:opp.id, opp_client_name:opp.clientName||"Unnamed",
-            meta:{role_title:form.role_title,role_type:form.role_type,urgency:form.urgency},
-          });
-          onForwarded?.();
-          onClose();
-        } catch(er){ setErr(er.message||"Failed to forward."); setBusy(false); }
-      };
-      return (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
-          <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 bg-orange-500">
-              <div>
-                <h2 className="text-sm font-bold text-white">&#127919; Forward to TA Team</h2>
-                <p className="text-xs text-orange-100 mt-0.5">Opportunity: <strong>{opp.clientName||"Unnamed"}</strong></p>
-              </div>
-              <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 text-xl leading-none">&times;</button>
-            </div>
-            <form onSubmit={submit} className="flex-1 overflow-y-auto p-4 space-y-4">
-              <FSec title="Role Details">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2"><FLabel req>Role / Position Title</FLabel><FInput value={form.role_title} onChange={f("role_title")} placeholder="e.g. Braze Campaign Specialist" required/></div>
-                  <div><FLabel>Role Type</FLabel><FSel value={form.role_type} onChange={f("role_type")} options={ROLE_TYPES}/></div>
-                  <div><FLabel>Urgency</FLabel><FSel value={form.urgency} onChange={f("urgency")} options={URGENCY_OPTS}/></div>
-                  <div><FLabel>Start Date</FLabel><FInput type="date" value={form.start_date} onChange={f("start_date")}/></div>
-                  <div><FLabel>Deadline to Fill</FLabel><FInput type="date" value={form.deadline} onChange={f("deadline")}/></div>
-                </div>
-              </FSec>
-              <FSec title="Requirements">
-                <div className="space-y-3">
-                  <div><FLabel>Skills Required</FLabel><FTxt value={form.skills_required} onChange={f("skills_required")} placeholder="e.g. Braze, CRM automation, email template coding, Liquid scripting\u2026" rows={3}/></div>
-                  <div><FLabel>Experience Required</FLabel><FInput value={form.experience_required} onChange={f("experience_required")} placeholder="e.g. 3\u20135 years in CRM / email marketing"/></div>
-                </div>
-              </FSec>
-              <FSec title="Hiring Budget (TA Reference Only)">
-                <div><FLabel>Budget (\u20B9 / month)</FLabel><FInput type="number" value={form.hiring_budget_inr} onChange={f("hiring_budget_inr")} placeholder="e.g. 80000"/></div>
-                <p className="text-[10px] text-gray-400 mt-1.5">Client&apos;s budget is not visible to TA. This is the internal hiring budget only.</p>
-              </FSec>
-              <FSec title="Notes for TA">
-                <FTxt value={form.notes} onChange={f("notes")} placeholder="Specific instructions, preferred profiles, cultural fit requirements\u2026" rows={3}/>
-              </FSec>
-              {err && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</p>}
-            </form>
-            <div className="flex gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50">
-              <button type="button" onClick={onClose} className="py-2.5 px-4 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-white transition-colors">Cancel</button>
-              <div className="flex-1"/>
-              <button type="button" onClick={submit} disabled={busy} className="py-2.5 px-5 bg-orange-500 text-white rounded-xl text-sm font-bold hover:bg-orange-600 disabled:opacity-60 flex items-center gap-2 transition-colors">{busy?<><Spinner sz="w-4 h-4" c="border-white"/>Forwarding\u2026</>:"&#127919; Forward to TA"}</button>
-            </div>
-          </div>
-        </div>
-      );
-    };
-
-    // ââ Hiring Roles page âââââââââââââââââââââââââââââââââââââââââââââââââââââ
-    const HiringRolesPage = ({role}) => {
-      const isTA = role==="ta";
-      const [items,setItems]   = useState([]);
-      const [loading,setLoad]  = useState(true);
-      const [search,setSearch] = useState("");
-      const [fSt,setFSt]       = useState("");
-      const [fUr,setFUr]       = useState("");
-      const [updId,setUpdId]   = useState(null);
-      useEffect(()=>{ dbH.load().then(d=>{ setItems(d); setLoad(false); }).catch(()=>setLoad(false)); },[]);
-      const filtered = useMemo(()=>{
-        let r=[...items];
-        if(search){ const q=search.toLowerCase(); r=r.filter(i=>[i.role_title,i.opp_client_name,i.role_type,i.skills_required].some(v=>(v||"").toLowerCase().includes(q))); }
-        if(fSt) r=r.filter(i=>i.status===fSt);
-        if(fUr) r=r.filter(i=>i.urgency===fUr);
-        return r;
-      },[items,search,fSt,fUr]);
-      const upd = async (id,status) => {
-        setUpdId(id);
-        try{ await dbH.upd(id,{status}); setItems(p=>p.map(x=>x.id===id?{...x,status}:x)); }catch{}
-        setUpdId(null);
-      };
-      if(loading) return <div className="flex justify-center p-12"><Spinner/></div>;
-      return (
-        <div className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-            <StatCard label="Total Roles"  value={items.length}/>
-            <StatCard label="Open"         value={items.filter(i=>i.status==="Open").length} hi/>
-            <StatCard label="In Progress"  value={items.filter(i=>i.status==="In Progress").length}/>
-            <StatCard label="Filled"       value={items.filter(i=>i.status==="Filled").length}/>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 mb-4">
-            <div className="flex flex-wrap gap-2 items-center">
-              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="&#128269;  Search role, client, skills&#8230;" className="flex-1 min-w-36 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"/>
-              <select value={fSt} onChange={e=>setFSt(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"><option value="">All Status</option>{HIRE_STATUS.map(s=><option key={s} value={s}>{s}</option>)}</select>
-              <select value={fUr} onChange={e=>setFUr(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"><option value="">All Urgency</option>{URGENCY_OPTS.map(u=><option key={u} value={u}>{u}</option>)}</select>
-              {(fSt||fUr||search)&&<button onClick={()=>{setSearch("");setFSt("");setFUr("");}} className="px-3 py-2 text-xs font-semibold text-gray-400 hover:text-red-500 border border-gray-200 rounded-lg transition-colors">&#10005; Clear</button>}
-            </div>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-            {filtered.length===0
-              ? <div className="text-center py-16"><div className="text-5xl mb-3">&#127919;</div><p className="text-gray-600 font-semibold">No hiring roles found</p><p className="text-gray-400 text-sm mt-1">Roles forwarded to TA will appear here.</p></div>
-              : <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 text-xs text-gray-400 font-bold uppercase tracking-wide bg-gray-50/80">
-                        <th className="px-5 py-3 text-left">Role Title</th>
-                        <th className="px-4 py-3 text-left">Client</th>
-                        <th className="px-4 py-3 text-left">Type</th>
-                        <th className="px-4 py-3 text-left">Urgency</th>
-                        <th className="px-4 py-3 text-left">Budget</th>
-                        <th className="px-4 py-3 text-left">Deadline</th>
-                        <th className="px-4 py-3 text-left">Status</th>
-                        {!isTA && <th className="px-4 py-3 text-left hidden lg:table-cell">Forwarded By</th>}
-                        <th className="px-4 py-3 text-left hidden xl:table-cell">Added</th>
-                        {isTA && <th className="px-4 py-3 w-36">Update Status</th>}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {filtered.map(item=>(
-                        <tr key={item.id} className="hover:bg-[#FFFEF5] transition-colors">
-                          <td className="px-5 py-3.5">
-                            <p className="font-bold text-[#1B1B1B]">{item.role_title}</p>
-                            {item.skills_required && <p className="text-xs text-gray-400 mt-0.5 max-w-[200px] truncate">{item.skills_required}</p>}
-                            {item.experience_required && <p className="text-xs text-blue-400 mt-0.5">{item.experience_required}</p>}
-                          </td>
-                          <td className="px-4 py-3.5 font-semibold text-[#1B1B1B]">{item.opp_client_name||"\u2014"}</td>
-                          <td className="px-4 py-3.5"><span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-semibold">{item.role_type||"Contractual"}</span></td>
-                          <td className="px-4 py-3.5"><UrgencyBadge urgency={item.urgency}/></td>
-                          <td className="px-4 py-3.5"><span className={`font-bold ${item.hiring_budget_inr?"text-[#1B1B1B]":"text-gray-300"}`}>{item.hiring_budget_inr?fmtINR(item.hiring_budget_inr):"\u2014"}</span></td>
-                          <td className="px-4 py-3.5 text-gray-500 text-xs whitespace-nowrap">{item.deadline?fmtDate(item.deadline):"\u2014"}</td>
-                          <td className="px-4 py-3.5">{updId===item.id?<Spinner sz="w-4 h-4" c="border-gray-400"/>:<HireBadge status={item.status}/>}</td>
-                          {!isTA && <td className="px-4 py-3.5 text-gray-400 text-xs hidden lg:table-cell">{item.forwarded_by_name||item.forwarded_by_email||"\u2014"}</td>}
-                          <td className="px-4 py-3.5 text-gray-400 text-xs hidden xl:table-cell whitespace-nowrap">{fmtDate(item.created_at)}</td>
-                          {isTA && (
-                            <td className="px-4 py-3.5">
-                              <select value={item.status||"Open"} onChange={e=>upd(item.id,e.target.value)} disabled={updId===item.id} className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]">
-                                {HIRE_STATUS.map(s=><option key={s} value={s}>{s}</option>)}
-                              </select>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50">
-                    <p className="text-xs text-gray-400 font-medium">Showing <strong className="text-[#1B1B1B]">{filtered.length}</strong> of <strong className="text-[#1B1B1B]">{items.length}</strong> roles</p>
-                  </div>
-                </div>
-            }
-          </div>
-        </div>
-      );
-    };
-
-    // ââ Team page âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     const TeamPage = () => {
-      const [list,setList]       = useState([]);
-      const [roles,setRoles]     = useState([]);
-      const [loading,setLoad]    = useState(true);
-      const [form,setForm]       = useState({email:"",role:"sales",full_name:""});
-      const [busy,setBusy]       = useState(false);
-      const [err,setErr]         = useState("");
-      const [ok,setOk]           = useState("");
-      const [webhook,setWebhook] = useState("");
-      const [wbBusy,setWbBusy]   = useState(false);
-      const [wbOk,setWbOk]       = useState("");
-      useEffect(()=>{
-        Promise.all([dbT.list(),dbT.roles(),dbS.get("notification_webhook")])
-          .then(([l,r,wh])=>{ setList(l); setRoles(r); setWebhook(wh||""); })
-          .catch(()=>{}).finally(()=>setLoad(false));
-      },[]);
+      const [list,setList] = useState([]);
+      const [roles,setRoles] = useState([]);
+      const [loading,setLoading] = useState(true);
+      const [form,setForm] = useState({email:"",role:"sales",full_name:""});
+      const [busy,setBusy] = useState(false);
+      const [err,setErr] = useState("");
+      const [ok,setOk] = useState("");
+      useEffect(()=>{ Promise.all([dbT.list(),dbT.roles()]).then(([l,r])=>{ setList(l); setRoles(r); }).catch(()=>{}).finally(()=>setLoading(false)); },[]);
       const add = async e => {
         e.preventDefault(); setBusy(true); setErr(""); setOk("");
-        try {
-          await dbT.add(form.email.toLowerCase().trim(),form.role,form.full_name.trim());
-          const l=await dbT.list(); setList(l);
-          setOk(`${form.email} added as ${form.role}. Share the app URL so they can sign up.`);
-          setForm({email:"",role:"sales",full_name:""});
-        } catch(er){ setErr(er.message||"Failed."); }
+        try { await dbT.add(form.email.toLowerCase().trim(),form.role,form.full_name.trim()); const l=await dbT.list(); setList(l); setOk(`${form.email} added as ${form.role}. Share the app URL so they can sign up.`); setForm({email:"",role:"sales",full_name:""}); }
+        catch(er){ setErr(er.message||"Failed."); }
         setBusy(false);
       };
       const rm = async (id,email) => {
         if(!confirm(`Remove ${email}?`)) return;
-        try{ await dbT.remove(id); setList(l=>l.filter(a=>a.id!==id)); }catch(er){ setErr(er.message); }
-      };
-      const saveWH = async () => {
-        setWbBusy(true); setWbOk("");
-        try{ await dbS.set("notification_webhook",webhook); setWbOk("Webhook URL saved!"); }catch{}
-        setWbBusy(false);
+        try { await dbT.remove(id); setList(l=>l.filter(a=>a.id!==id)); } catch(er){ setErr(er.message); }
       };
       if(loading) return <div className="flex justify-center p-12"><Spinner/></div>;
       return (
@@ -622,148 +340,64 @@
             <form onSubmit={add} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div><FLabel>Full Name</FLabel><FInput value={form.full_name} onChange={e=>setForm(p=>({...p,full_name:e.target.value}))} placeholder="Anita Sharma"/></div>
-                <div><FLabel req>Role</FLabel>
-                  <select value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))} className={`${iCls} bg-white`}>
-                    <option value="sales">Sales</option>
-                    <option value="growth">Growth</option>
-                    <option value="marketing">Marketing</option>
-                    <option value="ops">Ops</option>
-                    <option value="ta">TA</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
+                <div><FLabel req>Role</FLabel><select value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))} className={`${iCls} bg-white`}><option value="sales">Sales</option><option value="growth">Growth</option><option value="ops">Ops</option><option value="admin">Admin</option></select></div>
               </div>
               <div><FLabel req>Work Email</FLabel><FInput type="email" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} placeholder="name@mavlers.com" required/></div>
               {err && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</p>}
               {ok  && <p className="text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2">{ok}</p>}
-              <button type="submit" disabled={busy} className="w-full py-2.5 bg-[#FFDD2F] text-[#1B1B1B] rounded-xl text-sm font-bold hover:bg-[#f5d000] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">{busy?<><Spinner sz="w-4 h-4" c="border-[#1B1B1B]"/>Adding&#8230;</>:"+ Add to Access List"}</button>
+              <button type="submit" disabled={busy} className="w-full py-2.5 bg-[#FFDD2F] text-[#1B1B1B] rounded-xl text-sm font-bold hover:bg-[#f5d000] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">{busy?<><Spinner sz="w-4 h-4" c="border-[#1B1B1B]"/>Addingâ¦</>:"+ Add to Access List"}</button>
             </form>
-            <div className="mt-3 p-3 bg-[#FFFBEA] rounded-xl border border-[#FFDD2F]/40 text-xs text-gray-600"><strong>How it works:</strong> Add email here &#8594; share the app URL &#8594; they sign up &#8594; role is auto-assigned.</div>
+            <div className="mt-3 p-3 bg-[#FFFBEA] rounded-xl border border-[#FFDD2F]/40 text-xs text-gray-600"><strong>How it works:</strong> Add email here â share the app URL â they sign up â role is auto-assigned.</div>
           </div>
-
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-[#1B1B1B] mb-1">&#128276; Notification Settings</h3>
-            <p className="text-xs text-gray-400 mb-4">Paste a webhook URL (Make, Zapier, n8n) to receive alerts via email or Google Space when opportunities are added, change stage, or are won.</p>
-            <div className="space-y-2">
-              <FLabel>Webhook URL</FLabel>
-              <div className="flex gap-2">
-                <input value={webhook} onChange={e=>setWebhook(e.target.value)} placeholder="https://hook.make.com/&#8230;" className={`${iCls} flex-1`}/>
-                <button onClick={saveWH} disabled={wbBusy} className="px-4 py-2 bg-[#1B1B1B] text-[#FFDD2F] rounded-lg text-xs font-bold hover:bg-black disabled:opacity-60 whitespace-nowrap transition-colors">{wbBusy?"Saving&#8230;":"Save"}</button>
-              </div>
-              {wbOk && <p className="text-xs text-green-700">{wbOk}</p>}
-              <p className="text-[10px] text-gray-400">Payload includes: event type, client name, stage, timestamp. Google Space: add an incoming webhook to your Space and paste the URL here.</p>
-            </div>
-          </div>
-
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100">
               <h3 className="text-sm font-bold text-[#1B1B1B]">Access List <span className="text-gray-400 font-normal">({list.length})</span></h3>
               <p className="text-xs text-gray-400 mt-0.5">Pre-approved emails. Green dot = signed up.</p>
             </div>
-            {list.length===0
-              ? <p className="text-sm text-gray-400 text-center py-10">No members added yet.</p>
+            {list.length===0 ? <p className="text-sm text-gray-400 text-center py-10">No members added yet.</p>
               : <div className="divide-y divide-gray-50">{list.map(a=>{ const active=roles.find(r=>r.email===a.email); return (
-                  <div key={a.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors">
-                    <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-[#1B1B1B] truncate">{a.full_name||a.email}</p>{a.full_name&&<p className="text-xs text-gray-400 truncate">{a.email}</p>}</div>
-                    <div className="flex items-center gap-2.5 ml-3 flex-shrink-0"><RoleBadge role={a.role}/><div className={`w-2 h-2 rounded-full ${active?"bg-green-400":"bg-gray-200"}`}/><button onClick={()=>rm(a.id,a.email)} className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors">&times;</button></div>
-                  </div>);
-              })}</div>
+                <div key={a.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                  <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-[#1B1B1B] truncate">{a.full_name||a.email}</p>{a.full_name&&<p className="text-xs text-gray-400 truncate">{a.email}</p>}</div>
+                  <div className="flex items-center gap-2.5 ml-3 flex-shrink-0"><RoleBadge role={a.role}/><div className={`w-2 h-2 rounded-full ${active?"bg-green-400":"bg-gray-200"}`}/><button onClick={()=>rm(a.id,a.email)} className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors">Ã</button></div>
+                </div>); })}</div>
             }
           </div>
         </div>
       );
     };
 
-    // ââ Dashboard âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     const Dashboard = ({session,userRole}) => {
       const {role,full_name} = userRole;
-      const uid    = session.user.id;
-      const uemail = session.user.email;
-      const uname  = full_name||uemail.split("@")[0];
-      const isTA   = role==="ta";
-
-      const [opps,setOpps]             = useState([]);
-      const [loading,setLoad]          = useState(true);
-      const [search,setSearch]         = useState("");
-      const [fStage,setFStage]         = useState("");
-      const [fSrc,setFSrc]             = useState("");
-      const [modal,setModal]           = useState(null);
-      const [nav,setNav]               = useState(isTA?"hiring":"opps");
-      const [sort,setSort]             = useState({field:"created_at",dir:"desc"});
-      const [delId,setDelId]           = useState(null);
-      const [stagePopup,setStagePopup] = useState(null);
-      const [stageBusy,setStageBusy]   = useState(null);
-      const [fwdModal,setFwdModal]     = useState(null);
-      const [webhookUrl,setWHUrl]      = useState("");
-      const [viewOpp,setViewOpp]       = useState(null);
-
-      useEffect(()=>{
-        dbO.load().then(d=>{ setOpps(d); setLoad(false); }).catch(()=>setLoad(false));
-        dbS.get("notification_webhook").then(u=>setWHUrl(u||"")).catch(()=>{});
-      },[]);
-
-      const pushNotif = async (type,message,oppId,clientName,meta={}) => {
-        try{ await dbN.add({type,message,opportunity_id:oppId,opp_client_name:clientName,meta}); }catch{}
-        fireWebhook(webhookUrl,{type,message,client:clientName,opportunity_id:oppId,timestamp:new Date().toISOString(),...meta});
-      };
-
+      const uid = session.user.id;
+      const [opps,setOpps]     = useState([]);
+      const [loading,setLoad]  = useState(true);
+      const [search,setSearch] = useState("");
+      const [fStage,setFStage] = useState("");
+      const [fSrc,setFSrc]     = useState("");
+      const [modal,setModal]   = useState(null);
+      const [nav,setNav]       = useState("opps");
+      const [sort,setSort]     = useState({field:"created_at",dir:"desc"});
+      const [delId,setDelId]   = useState(null);
+      useEffect(()=>{ dbO.load().then(d=>{ setOpps(d); setLoad(false); }).catch(()=>setLoad(false)); },[]);
       const filtered = useMemo(()=>{
         let r=[...opps];
-        if(search){ const q=search.toLowerCase(); r=r.filter(o=>[o.clientName,o.primaryPlatform,...(o.platforms||[]),o.opportunityOwner,o.source].some(v=>(v||"").toLowerCase().includes(q))); }
+        if(search){ const q=search.toLowerCase(); r=r.filter(o=>[o.clientName,o.primaryPlatform,o.opportunityOwner,o.source].some(v=>(v||"").toLowerCase().includes(q))); }
         if(fStage) r=r.filter(o=>o.stage===fStage);
         if(fSrc)   r=r.filter(o=>o.source===fSrc);
         r.sort((a,b)=>{ let va=a[sort.field]||"",vb=b[sort.field]||""; if(sort.field==="potentialMonthlyRevenue"){va=Number(va)||0;vb=Number(vb)||0;} return sort.dir==="asc"?(va>vb?1:-1):(va<vb?1:-1); });
         return r;
       },[opps,search,fStage,fSrc,sort]);
-
-      const stats = useMemo(()=>{ const active=opps.filter(o=>!["Won","Lost","On Hold"].includes(o.stage)); const won=opps.filter(o=>o.stage==="Won"); return {total:opps.length,active:active.length,pipe:active.reduce((s,o)=>s+(Number(o.potentialMonthlyRevenue)||0),0),won:won.reduce((s,o)=>s+(Number(o.potentialMonthlyRevenue)||0),0)}; },[opps]);
-
+      const stats = useMemo(()=>{ const active=opps.filter(o=>!["Won","Lost","On Hold"].includes(o.stage)); const won=opps.filter(o=>o.stage==="Won"); return { total:opps.length, active:active.length, pipe:active.reduce((s,o)=>s+(Number(o.potentialMonthlyRevenue)||0),0), won:won.reduce((s,o)=>s+(Number(o.potentialMonthlyRevenue)||0),0) }; },[opps]);
       const togSort = f => setSort(s=>s.field===f?{...s,dir:s.dir==="asc"?"desc":"asc"}:{field:f,dir:"asc"});
-      const Arr     = ({f}) => sort.field===f?<span className="ml-0.5 opacity-50">{sort.dir==="asc"?"&#8593;":"&#8595;"}</span>:null;
-
+      const Arr = ({f}) => sort.field===f ? <span className="ml-0.5 opacity-50">{sort.dir==="asc"?"â":"â"}</span> : null;
       const handleDel = async id => {
         if(!confirm("Delete this opportunity? Cannot be undone.")) return;
         setDelId(id);
-        try{ await dbO.del(id); setOpps(p=>p.filter(o=>o.id!==id)); }catch{}
+        try { await dbO.del(id); setOpps(p=>p.filter(o=>o.id!==id)); } catch {}
         setDelId(null);
       };
-
-      const handleStageChange = async (oppId, newStage) => {
-        const opp=opps.find(o=>o.id===oppId); if(!opp) return;
-        setStageBusy(oppId); setStagePopup(null);
-        try {
-          const {id,created_at,...payload}=opp;
-          await dbO.upd(oppId,{...payload,stage:newStage,primaryPlatform:(opp.platforms||[])[0]||opp.primaryPlatform||""});
-          setOpps(prev=>prev.map(o=>o.id===oppId?{...o,stage:newStage}:o));
-          const type = newStage==="Won"?"opp_won":"stage_changed";
-          const msg  = newStage==="Won"
-            ? `\u{1F3C6} "${opp.clientName||"Unnamed"}" \u2014 WON! ${opp.potentialMonthlyRevenue?`(${fmtINR(Number(opp.potentialMonthlyRevenue))}/mo)`:""}`
-            : `\u{1F4CB} "${opp.clientName||"Unnamed"}" moved to "${newStage}" by ${uname}`;
-          await pushNotif(type,msg.trim(),oppId,opp.clientName,{old_stage:opp.stage,new_stage:newStage,changed_by:uemail});
-        }catch{}
-        setStageBusy(null);
-      };
-
-      const onSaved = async o => {
-        try{
-          const isNew=!opps.find(x=>x.id===o.id);
-          setOpps(prev=>{ const i=prev.findIndex(x=>x.id===o.id); return i>=0?prev.map(x=>x.id===o.id?o:x):[o,...prev]; });
-          if(isNew) await pushNotif("opp_added",`\u2728 New opportunity: "${o.clientName||"Unnamed"}" added by ${uname}`,o.id,o.clientName,{stage:o.stage,owner:uname});
-        }catch{ dbO.load().then(d=>setOpps(d)).catch(()=>{}); }
-      };
-
+      const onSaved = o => setOpps(prev=>{ const i=prev.findIndex(x=>x.id===o.id); return i>=0?prev.map(x=>x.id===o.id?o:x):[o,...prev]; });
       const filtPipe = filtered.reduce((s,o)=>s+(Number(o.potentialMonthlyRevenue)||0),0);
-      const getPlatformDisplay = o => {
-        const p=o.platforms&&o.platforms.length?o.platforms:(o.primaryPlatform?[o.primaryPlatform]:[]);
-        if(!p.length) return "\u2014"; if(p.length===1) return p[0]; return `${p[0]} +${p.length-1}`;
-      };
-
-      const navTabs = [
-        ...(!isTA?[["opps","&#128202; Opportunities"]]:[]),
-        ["hiring","&#127919; Hiring Roles"],
-        ...(can.team(role)?[["team","&#128101; Team"]]:[]),
-      ];
-
       return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
           <header className="bg-[#1B1B1B] px-5 py-3 flex items-center justify-between sticky top-0 z-40 shadow-xl">
@@ -773,24 +407,17 @@
               <span className="text-white text-sm font-bold tracking-wide hidden sm:block">Opportunity Tracker</span>
             </div>
             <div className="flex items-center gap-2.5">
-              <NotificationBell userId={uid}/>
-              <div className="w-px h-5 bg-gray-600"/>
-              <div className="text-right hidden md:block"><p className="text-white text-xs font-semibold leading-tight">{uname}</p><p className="text-gray-500 text-xs">{uemail}</p></div>
+              <div className="text-right hidden md:block"><p className="text-white text-xs font-semibold leading-tight">{full_name||session.user.email.split("@")[0]}</p><p className="text-gray-500 text-xs">{session.user.email}</p></div>
               <RoleBadge role={role}/>
               <button onClick={()=>db.auth.signOut()} className="text-xs text-gray-500 hover:text-[#FFDD2F] font-medium transition-colors ml-1">Sign out</button>
             </div>
           </header>
-
           <div className="bg-white border-b border-gray-200 px-5">
             <div className="flex">
-              {navTabs.map(([t,l])=>(
-                <button key={t} onClick={()=>setNav(t)} className={`py-3 px-4 text-xs sm:text-sm font-bold transition-all border-b-2 ${nav===t?"border-[#FFDD2F] text-[#1B1B1B]":"border-transparent text-gray-400 hover:text-gray-600"}`} dangerouslySetInnerHTML={{__html:l}}/>
-              ))}
+              {[["opps","ð Opportunities"],...(can.team(role)?[["team","ð¥ Team"]]:[])] .map(([t,l])=><button key={t} onClick={()=>setNav(t)} className={`py-3 px-4 text-xs sm:text-sm font-bold transition-all border-b-2 ${nav===t?"border-[#FFDD2F] text-[#1B1B1B]":"border-transparent text-gray-400 hover:text-gray-600"}`}>{l}</button>)}
             </div>
           </div>
-
-          {nav==="team"&&can.team(role) ? <TeamPage/> :
-           nav==="hiring"               ? <HiringRolesPage role={role}/> : (
+          {nav==="team"&&can.team(role) ? <TeamPage/> : (
             <div className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
                 <StatCard label="Total Opps"       value={stats.total}/>
@@ -800,21 +427,21 @@
               </div>
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 mb-4">
                 <div className="flex flex-wrap gap-2 items-center">
-                  <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="&#128269;  Search client, platform, owner&#8230;" className="flex-1 min-w-36 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"/>
+                  <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ð  Search client, platform, ownerâ¦" className="flex-1 min-w-36 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"/>
                   <select value={fStage} onChange={e=>setFStage(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"><option value="">All Stages</option>{STAGES.map(s=><option key={s} value={s}>{s}</option>)}</select>
                   <select value={fSrc}   onChange={e=>setFSrc(e.target.value)}   className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"><option value="">All Sources</option>{SOURCES.map(s=><option key={s} value={s}>{s}</option>)}</select>
-                  {(fStage||fSrc||search)&&<button onClick={()=>{setSearch("");setFStage("");setFSrc("");}} className="px-3 py-2 text-xs font-semibold text-gray-400 hover:text-red-500 border border-gray-200 rounded-lg transition-colors">&#10005; Clear</button>}
+                  {(fStage||fSrc||search)&&<button onClick={()=>{setSearch("");setFStage("");setFSrc("");}} className="px-3 py-2 text-xs font-semibold text-gray-400 hover:text-red-500 border border-gray-200 rounded-lg transition-colors">â Clear</button>}
                   <div className="flex-1"/>
                   {can.create(role)&&<button onClick={()=>setModal({mode:"add"})} className="flex items-center gap-1.5 px-4 py-2 bg-[#FFDD2F] text-[#1B1B1B] rounded-lg text-sm font-bold hover:bg-[#f5d000] transition-colors whitespace-nowrap shadow-sm">+ Add Opportunity</button>}
                 </div>
               </div>
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 {loading
-                  ? <div className="flex flex-col items-center justify-center p-16 gap-4"><Spinner sz="w-8 h-8"/><p className="text-sm text-gray-400">Loading opportunities&#8230;</p></div>
+                  ? <div className="flex flex-col items-center justify-center p-16 gap-4"><Spinner sz="w-8 h-8"/><p className="text-sm text-gray-400">Loading opportunitiesâ¦</p></div>
                   : filtered.length===0
-                    ? <div className="text-center py-16"><div className="text-5xl mb-3">&#128203;</div><p className="text-gray-600 font-semibold">No opportunities found</p><p className="text-gray-400 text-sm mt-1">{can.create(role)?"Click + Add Opportunity to get started.":"No entries match your filters."}</p></div>
+                    ? <div className="text-center py-16"><div className="text-5xl mb-3">ð</div><p className="text-gray-600 font-semibold">No opportunities found</p><p className="text-gray-400 text-sm mt-1">{can.create(role)?"Click + Add Opportunity to get started.":"No entries match your filters."}</p></div>
                     : (<>
-                        <div className="overflox-x-auto">
+                        <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b border-gray-100 text-xs text-gray-400 font-bold uppercase tracking-wide bg-gray-50/80">
@@ -825,34 +452,23 @@
                                 <th className="px-4 py-3 text-left hidden md:table-cell">Source</th>
                                 <th className="px-4 py-3 text-left hidden lg:table-cell">Owner</th>
                                 <th className="px-4 py-3 text-left hidden xl:table-cell cursor-pointer hover:text-[#1B1B1B] select-none" onClick={()=>togSort("created_at")}>Added<Arr f="created_at"/></th>
-                                <th className="px-4 py-3 w-36"/>
+                                <th className="px-4 py-3 w-24"/>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                               {filtered.map(o=>(
-                                <tr key={o.id} onClick={()=>setViewOpp(o)} className="hover:bg-[#FFFEF5] transition-colors group cursor-pointer">
-                                  <td className="px-5 py-3.5"><p className="font-bold text-[#1B1B1B] truncate max-w-[180px]">{o.clientName||<span className="text-gray-300 italic font-normal">Unnamed</span>}</p>{o.industry&&<p className="text-xs text-gray-400">{o.industry}{o.clientSize?` \u00B7 ${o.clientSize}`:""}</p>}</td>
-                                  <td className="px-4 py-3.5 text-gray-600 truncate max-w-[140px]">{getPlatformDisplay(o)}</td>
-                                  <td className="px-4 py-3.5 relative" onClick={e=>e.stopPropagation()}>
-                                    {stageBusy===o.id
-                                      ? <Spinner sz="w-4 h-4" c="border-gray-400"/>
-                                      : <div className="relative inline-block">
-                                          <button onClick={()=>can.edit(role,o,uid)?setStagePopup(stagePopup===o.id?null:o.id):null} title={can.edit(role,o,uid)?"Click to change stage":undefined} className={`${can.edit(role,o,uid)?"cursor-pointer hover:opacity-80":"cursor-default"} transition-opacity`}>
-                                            <StageBadge stage={o.stage||"New Lead"}/>
-                                          </button>
-                                          {stagePopup===o.id && <StageDropdown currentStage={o.stage||"New Lead"} onSelect={s=>handleStageChange(o.id,s)} onClose={()=>setStagePopup(null)}/>}
-                                        </div>
-                                    }
-                                  </td>
-                                  <td className="px-4 py-3.5"><span className={`font-bold ${o.potentialMonthlyRevenue?"text-[#1B1B1B]":"text-gray-300"}`}>{o.potentialMonthlyRevenue?fmtINR(Number(o.potentialMonthlyRevenue)):"\u2014"}</span></td>
-                                  <td className="px-4 py-3.5 text-gray-500 hidden md:table-cell">{o.source||"\u2014"}</td>
-                                  <td className="px-4 py-3.5 text-gray-500 text-xs hidden lg:table-cell truncate max-w-[120px]">{o.opportunityOwner||"\u2014"}</td>
+                                <tr key={o.id} className="hover:bg-[#FFFEF5] transition-colors group">
+                                  <td className="px-5 py-3.5"><p className="font-bold text-[#1B1B1B] truncate max-w-[180px]">{o.clientName||<span className="text-gray-300 italic font-normal">Unnamed</span>}</p>{o.industry&&<p className="text-xs text-gray-400">{o.industry}{o.clientSize?` Â· ${o.clientSize}`:""}</p>}</td>
+                                  <td className="px-4 py-3.5 text-gray-600 truncate max-w-[140px]">{o.primaryPlatform||"â"}</td>
+                                  <td className="px-4 py-3.5"><StageBadge stage={o.stage||"New Lead"}/></td>
+                                  <td className="px-4 py-3.5"><span className={`font-bold ${o.potentialMonthlyRevenue?"text-[#1B1B1B]":"text-gray-300"}`}>{o.potentialMonthlyRevenue?fmtINR(Number(o.potentialMonthlyRevenue)):"â"}</span></td>
+                                  <td className="px-4 py-3.5 text-gray-500 hidden md:table-cell">{o.source||"â"}</td>
+                                  <td className="px-4 py-3.5 text-gray-500 text-xs hidden lg:table-cell truncate max-w-[120px]">{o.opportunityOwner||"â"}</td>
                                   <td className="px-4 py-3.5 text-gray-400 text-xs hidden xl:table-cell whitespace-nowrap">{fmtDate(o.created_at)}</td>
-                                  <td className="px-4 py-3.5" onClick={e=>e.stopPropagation()}>
+                                  <td className="px-4 py-3.5">
                                     <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                                      {can.forwardTA(role)&&<button onClick={()=>setFwdModal(o)} className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors whitespace-nowrap" title="Forward to TA">&#127919; TA</button>}
                                       {can.edit(role,o,uid)&&<button onClick={()=>setModal({mode:"edit",data:o})} className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-[#FFDD2F]/20 text-[#1B1B1B] hover:bg-[#FFDD2F] transition-colors">Edit</button>}
-                                      {can.del(role)&&<button onClick={()=>handleDel(o.id)} disabled={delId===o.id} className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 transition-colors">{delId===o.id?"&#8230;":"Del"}</button>}
+                                      {can.del(role,o,uid)&&<button onClick={()=>handleDel(o.id)} disabled={delId===o.id} className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 transition-colors">{delId===o.id?"â¦":"Del"}</button>}
                                     </div>
                                   </td>
                                 </tr>
@@ -869,135 +485,29 @@
               </div>
             </div>
           )}
-          {modal    && <OppModal editData={modal.mode==="edit"?modal.data:null} userId={uid} role={role} onClose={()=>{ setModal(null); dbO.load().then(d=>setOpps(d)).catch(()=>{}); }} onSaved={onSaved}/>}
-          {fwdModal && <ForwardToTAModal opp={fwdModal} userEmail={uemail} userName={uname} onClose={()=>setFwdModal(null)} onForwarded={()=>{}}/>}
-          {viewOpp  && <ViewPanel opp={viewOpp} onClose={()=>setViewOpp(null)} role={role} uid={uid} onEdit={()=>{ setModal({mode:"edit",data:viewOpp}); setViewOpp(null); }}/>}
+          {modal&&<OppModal editData={modal.mode==="edit"?modal.data:null} userId={uid} role={role} onClose={()=>setModal(null)} onSaved={onSaved}/>}
         </div>
       );
     };
 
-    // ââ View Panel (read-only slide-in) ââââââââââââââââââââââââââââââââââââââ
-    const ViewPanel = ({opp, onClose, role, uid, onEdit}) => {
-      const Row = ({label, value}) => value ? (
-        <div className="py-2.5 border-b border-gray-50 last:border-0">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
-          <p className="text-sm text-[#1B1B1B] font-medium leading-snug">{value}</p>
-        </div>
-      ) : null;
-
-      const platforms = opp.platforms && opp.platforms.length ? opp.platforms : (opp.primaryPlatform ? [opp.primaryPlatform] : []);
-      const sm = STAGE_META[opp.stage||"New Lead"] || STAGE_META["New Lead"];
-
-      return (
-        <div className="fixed inset-0 z-[55] flex justify-end" onClick={onClose}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"/>
-          <div className="relative w-full max-w-md bg-white h-full flex flex-col shadow-2xl overflow-hidden"
-               onClick={e=>e.stopPropagation()}>
-            {/* Header */}
-            <div className="flex items-start justify-between px-5 py-4 bg-[#1B1B1B]">
-              <div className="min-w-0">
-                <h2 className="text-base font-bold text-white truncate">{opp.clientName||"Unnamed"}</h2>
-                {opp.industry && <p className="text-xs text-gray-400 mt-0.5">{opp.industry}</p>}
-              </div>
-              <div className="flex items-center gap-2 ml-3 flex-shrink-0">
-                <span className={`text-xs font-bold px-2 py-1 rounded-full border ${sm.bg} ${sm.text} ${sm.border}`}>
-                  {opp.stage||"New Lead"}
-                </span>
-                <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 text-lg leading-none transition-colors">&times;</button>
-              </div>
-            </div>
-
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
-
-              {/* Platforms */}
-              {platforms.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Platform(s)</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {platforms.map(p=>(
-                      <span key={p} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full font-semibold">{p}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Key details */}
-              <div className="bg-gray-50 rounded-xl p-4 space-y-0">
-                <Row label="Opportunity Owner" value={opp.opportunityOwner}/>
-                <Row label="Source"             value={opp.source}/>
-                <Row label="Engagement Type"    value={opp.engagementType}/>
-                <Row label="Billing Model"      value={opp.billingModel}/>
-                <Row label="Estimated Hours"    value={opp.estimatedHours ? `${opp.estimatedHours} hrs` : null}/>
-                <Row label="Potential Monthly Revenue" value={opp.potentialMonthlyRevenue ? fmtINR(Number(opp.potentialMonthlyRevenue)) : null}/>
-              </div>
-
-              {/* Scope / Notes */}
-              {opp.notes && (
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Notes / Scope</p>
-                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded-xl p-4">{opp.notes}</p>
-                </div>
-              )}
-
-              {/* Problem statement */}
-              {opp.problemStatement && (
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Problem Statement</p>
-                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded-xl p-4">{opp.problemStatement}</p>
-                </div>
-              )}
-
-              {/* Secondary details */}
-              <div className="bg-gray-50 rounded-xl p-4 space-y-0">
-                <Row label="Client Size"         value={opp.clientSize}/>
-                <Row label="POC"                  value={opp.poc}/>
-                <Row label="POC Email"            value={opp.pocEmail}/>
-                <Row label="Expertise Needed"     value={Array.isArray(opp.expertise) ? opp.expertise.join(", ") : opp.expertise}/>
-                <Row label="Copywriting"          value={opp.copywriting}/>
-                <Row label="Email Production"     value={opp.emailProduction}/>
-                <Row label="Timezone"             value={opp.timezone}/>
-                <Row label="Support Window"       value={opp.supportWindow}/>
-              </div>
-
-              {/* Timestamps */}
-              <div className="text-xs text-gray-400 space-y-0.5 pt-1">
-                {opp.created_at && <p>Added: {fmtDate(opp.created_at)}</p>}
-              </div>
-            </div>
-
-            {/* Footer */}
-            {can.edit(role, opp, uid) && (
-              <div className="px-5 py-4 border-t border-gray-100 bg-gray-50">
-                <button onClick={onEdit} className="w-full py-2.5 bg-[#FFDD2F] text-[#1B1B1B] rounded-xl text-sm font-bold hover:bg-[#f5d000] transition-colors">
-                  Edit Opportunity
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    };
-
-    // ââ App root ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     function App() {
       const [session,setSession]   = useState(undefined);
       const [userRole,setUserRole] = useState(null);
       const [roleLoad,setRoleLoad] = useState(false);
       const fetchRole = useCallback(async uid => {
         setRoleLoad(true);
-        try{ const {data}=await db.from("user_roles").select("role,full_name,email").eq("user_id",uid).single(); setUserRole(data||null); }
-        catch{ setUserRole(null); }
+        try { const {data}=await db.from("user_roles").select("role,full_name,email").eq("user_id",uid).single(); setUserRole(data||null); }
+        catch { setUserRole(null); }
         setRoleLoad(false);
       },[]);
       useEffect(()=>{
         db.auth.getSession().then(({data:{session:s}})=>{ setSession(s||null); if(s) fetchRole(s.user.id); });
-        const {data:{subscription}}=db.auth.onAuthStateChange((_e,s)=>{ setSession(s||null); if(s) fetchRole(s.user.id); else setUserRole(null); });
+        const {data:{asubscription}}=db.auth.onAuthStateChange((_e,s)=>{ setSession(s||null); if(s) fetchRole(s.user.id); else { setUserRole(null); } });
         return ()=>subscription.unsubscribe();
       },[fetchRole]);
       if(session===undefined||roleLoad) return <LoadingScreen/>;
-      if(!session)  return <AuthPage/>;
-      if(!userRole) return <NoAccess onOut={()=>db.auth.signOut()} email={session.user.email}/>;
+      if(!session)   return <AuthPage/>;
+      if(!userRole)  return <NoAccess onOut={()=>db.auth.signOut()} email={session.user.email}/>;
       return <Dashboard session={session} userRole={userRole}/>;
     }
 
