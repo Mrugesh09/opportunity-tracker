@@ -784,7 +784,7 @@
       const stats = useMemo(() => { const active = opps.filter(o => !["Won", "Lost", "On Hold"].includes(o.stage)); const won = opps.filter(o => o.stage === "Won"); return { total: opps.length, active: active.length, pipe: active.reduce((s, o) => s + (Number(o.potentialMonthlyRevenue) || 0), 0), won: won.reduce((s, o) => s + (Number(o.potentialMonthlyRevenue) || 0), 0) }; }, [opps]);
 
       const togSort = f => setSort(s => s.field === f ? { ...s, dir: s.dir === "asc" ? "desc" : "asc" } : { field: f, dir: "asc" });
-      const Arr = ({ f }) => sort.field === f ? <span className="ml-0.5 opacity-50">{sort.dir === "asc" ? "&#8593;" : "&#8595;"}</span> : null;
+      const Arr = ({ f }) => sort.field === f ? <span className="ml-0.5 opacity-50">{sort.dir === "asc" ? "↑" : "↓"}</span> : null;
 
       const handleDel = async id => {
         if (!confirm("Delete this opportunity? Cannot be undone.")) return;
