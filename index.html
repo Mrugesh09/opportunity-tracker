@@ -80,7 +80,9 @@
     const MODAL_TABS = ["Client", "Engagement", "Problem", "Scope", "Decision", "Pipeline"];
     const ROLE_TYPES = ["Contractual", "Full-Time", "Part-Time", "Freelance"];
     const URGENCY_OPTS = ["Low", "Normal", "High", "Critical"];
-    const HIRE_STATUS = ["Open", "In Progress", "Filled", "Cancelled"];
+    const HIRE_STATUS = ["Open", "Sourcing", "Interviewing", "Finalised", "Cancelled"];
+    const CURRENCIES = ["USD", "AUD", "EUR"];
+    const FX_TO_USD = { USD: 1.00, AUD: 0.65, EUR: 1.08 };
 
     const ROLE_META = {
       admin: { label: "Admin", bg: "bg-[#1B1B1B]", text: "text-[#FFDD2F]" },
@@ -116,6 +118,8 @@
       load: () => db.from("hiring_roles").select("*").order("created_at", { ascending: false }).then(({ data, error }) => { if (error) throw error; return data || []; }),
       add: d => db.from("hiring_roles").insert(d).select().single().then(({ data, error }) => { if (error) throw error; return data; }),
       upd: (id, d) => db.from("hiring_roles").update(d).eq("id", id).then(({ error }) => { if (error) throw error; }),
+      updCandidate: (id, status, cand) => db.from("hiring_roles").update({ status, ...cand }).eq("id", id).then(({ error }) => { if (error) throw error; }),
+      del: id => db.from("hiring_roles").delete().eq("id", id).then(({ error }) => { if (error) throw error; }),
     };
     const dbN = {
       load: () => db.from("notifications").select("*").order("created_at", { ascending: false }).limit(60).then(({ data, error }) => { if (error) throw error; return data || []; }),
@@ -129,6 +133,9 @@
 
     // ── Utility ───────────────────────────────────────────────────────────────
     const fmtINR = n => { const v = Number(n) || 0; if (v >= 10000000) return `\u20B9${(v / 10000000).toFixed(1)}Cr`; if (v >= 100000) return `\u20B9${(v / 100000).toFixed(1)}L`; if (v >= 1000) return `\u20B9${(v / 1000).toFixed(0)}K`; return `\u20B9${v}`; };
+    const fmtUSD = n => { const v = Number(n) || 0; if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`; if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`; return `$${v.toFixed(0)}`; };
+    const toUSD = (amt, cur) => (Number(amt) || 0) * (FX_TO_USD[cur] || 1);
+    const fmtCurr = (amt, cur) => { const v = Number(amt) || 0; const sym = { USD: "$", AUD: "A$", EUR: "\u20AC" }[cur] || "$"; if (v >= 1000000) return `${sym}${(v / 1000000).toFixed(1)}M`; if (v >= 1000) return `${sym}${(v / 1000).toFixed(0)}K`; return `${sym}${v.toFixed(0)}`; };
     const fmtDate = s => s ? new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" }) : "\u2014";
     const todayStr = () => new Date().toISOString().slice(0, 10);
     const fireWebhook = async (url, payload) => { if (!url) return; try { await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); } catch { } };
@@ -138,7 +145,7 @@
     const StageBadge = ({ stage }) => { const m = STAGE_META[stage] || STAGE_META["New Lead"]; return <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${m.bg} ${m.text} ${m.border}`}><span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />{stage || "New Lead"}</span>; };
     const RoleBadge = ({ role }) => { const m = ROLE_META[role] || { label: role, bg: "bg-gray-200", text: "text-gray-700" }; return <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${m.bg} ${m.text}`}>{m.label}</span>; };
     const UrgencyBadge = ({ urgency }) => { const c = { Low: "bg-gray-100 text-gray-600", Normal: "bg-blue-50 text-blue-700", High: "bg-orange-50 text-orange-700", Critical: "bg-red-50 text-red-700" }; return <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c[urgency] || c.Normal}`}>{urgency || "Normal"}</span>; };
-    const HireBadge = ({ status }) => { const c = { Open: "bg-green-50 text-green-700", "In Progress": "bg-blue-50 text-blue-700", Filled: "bg-gray-100 text-gray-600", Cancelled: "bg-red-50 text-red-600" }; return <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c[status] || c.Open}`}>{status || "Open"}</span>; };
+    const HireBadge = ({ status }) => { const c = { Open: "bg-green-50 text-green-700", Sourcing: "bg-blue-50 text-blue-700", Interviewing: "bg-purple-50 text-purple-700", Finalised: "bg-emerald-100 text-emerald-800", Cancelled: "bg-red-50 text-red-600" }; return <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c[status] || c.Open}`}>{status || "Open"}</span>; };
 
     const iCls = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FFDD2F] focus:border-transparent";
     const dCls = "disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed";
@@ -280,14 +287,14 @@
       platforms: [],
       discoveryCallUrl: "", onboardingCallUrl: "",
       scopeOfWork: "", copywritingRequirement: "", emailProductionRequirement: "",
-      budgetRange: "", estimatedHours: "", potentialMonthlyRevenue: "",
-      projectCost: "", projectTimeline: "",
+      budgetRange: "", estimatedHours: "", potentialMonthlyRevenue: "", revenueCurrency: "USD",
+      projectCost: "", projectCostCurrency: "USD", projectTimeline: "",
       clientTimezone: "", supportWindow: "",
       stage: "New Lead", salesNotes: "", debriefNotes: "", additionalNotes: ""
     });
 
     // ── Opportunity modal ─────────────────────────────────────────────────────
-    const OppModal = ({ editData, userId, role, onClose, onSaved }) => {
+    const OppModal = ({ editData, userId, role, updatedBy, onClose, onSaved }) => {
       const ops = role === "ops";
       const isEdit = !!editData;
       const init = isEdit ? { ...blankForm(), ...editData, platforms: editData.platforms || (editData.primaryPlatform ? [editData.primaryPlatform] : []), expertiseOther: editData.expertiseOther || "" } : blankForm();
@@ -295,6 +302,8 @@
       const [tab, setTab] = useState(ops ? 5 : 0);
       const [busy, setBusy] = useState(false);
       const [err, setErr] = useState("");
+      const [teamMembers, setTeamMembers] = useState([]);
+      useEffect(() => { dbT.list().then(l => setTeamMembers(l.map(m => m.full_name || m.email).filter(Boolean))).catch(() => { }); }, []);
       const f = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
       const fv = k => v => setForm(p => ({ ...p, [k]: v }));
       const hasCopy = (form.expertiseNeeded || []).includes("Copywriting");
@@ -304,7 +313,7 @@
         if (!ops && !form.clientName) { setErr("Client name is required."); setTab(0); return; }
         setBusy(true); setErr("");
         try {
-          const pl = { ...form, primaryPlatform: (form.platforms || [])[0] || "", owner_id: isEdit ? (editData.owner_id || userId) : userId };
+          const pl = { ...form, primaryPlatform: (form.platforms || [])[0] || "", owner_id: isEdit ? (editData.owner_id || userId) : userId, updated_at: new Date().toISOString(), updated_by: updatedBy || userId };
           if (isEdit) { await dbO.upd(editData.id, pl); try { onSaved({ id: editData.id, created_at: editData.created_at, ...pl }); } catch (se) { console.error(se); } }
           else { const c = await dbO.add(pl); try { onSaved(c); } catch (se) { console.error(se); } }
           onClose();
@@ -324,8 +333,20 @@
             <div><FLabel>POC Title</FLabel><FInput value={form.pocTitle} onChange={f("pocTitle")} placeholder="e.g. Head of Marketing" disabled={ops} /></div>
             <div><FLabel>POC Email</FLabel><FInput type="email" value={form.pocEmail} onChange={f("pocEmail")} placeholder="jane@company.com" disabled={ops} /></div>
             <div><FLabel>POC Phone</FLabel><FInput value={form.pocPhone} onChange={f("pocPhone")} placeholder="+91 \u2026" disabled={ops} /></div>
-            <div><FLabel>Opportunity Owner (CSM)</FLabel><FInput value={form.opportunityOwner} onChange={f("opportunityOwner")} placeholder="e.g. Rahul Mehta" disabled={ops} /></div>
-            <div><FLabel>Assigned Sales</FLabel><FInput value={form.assignedToSales} onChange={f("assignedToSales")} placeholder="e.g. Anita Sharma" disabled={ops} /></div>
+            <div><FLabel>Opportunity Owner (CSM)</FLabel>
+              <select value={form.opportunityOwner || ""} onChange={f("opportunityOwner")} disabled={ops} className={`${iCls} bg-white ${dCls}`}>
+                <option value="">Select team member\u2026</option>
+                {teamMembers.map(m => <option key={m} value={m}>{m}</option>)}
+                {form.opportunityOwner && !teamMembers.includes(form.opportunityOwner) && <option value={form.opportunityOwner}>{form.opportunityOwner}</option>}
+              </select>
+            </div>
+            <div><FLabel>Assigned Sales</FLabel>
+              <select value={form.assignedToSales || ""} onChange={f("assignedToSales")} disabled={ops} className={`${iCls} bg-white ${dCls}`}>
+                <option value="">Select team member\u2026</option>
+                {teamMembers.map(m => <option key={m} value={m}>{m}</option>)}
+                {form.assignedToSales && !teamMembers.includes(form.assignedToSales) && <option value={form.assignedToSales}>{form.assignedToSales}</option>}
+              </select>
+            </div>
             <div><FLabel>Created Date</FLabel><FInput type="date" value={form.opportunityCreationDate} onChange={f("opportunityCreationDate")} disabled={ops} /></div>
           </div></FSec>
         </div>,
@@ -353,11 +374,11 @@
           <FSec title="Budget"><div><FLabel>Budget Range (if shared)</FLabel><FInput value={form.budgetRange} onChange={f("budgetRange")} placeholder="e.g. \u20B95\u20138L / month" disabled={ops} /></div></FSec>
           <FSec title="Commercial Details">
             {isP2P ? <div className="grid grid-cols-2 gap-3">
-              <div><FLabel>Project Cost (\u20B9)</FLabel><FInput type="number" value={form.projectCost} onChange={f("projectCost")} placeholder="e.g. 500000" disabled={ops} /></div>
-              <div><FLabel>Project Timeline</FLabel><FInput value={form.projectTimeline} onChange={f("projectTimeline")} placeholder="e.g. 6 weeks" disabled={ops} /></div>
+              <div className="col-span-2"><FLabel>Project Cost</FLabel><div className="flex gap-2"><FSel value={form.projectCostCurrency} onChange={f("projectCostCurrency")} options={CURRENCIES} disabled={ops} /><FInput type="number" value={form.projectCost} onChange={f("projectCost")} placeholder="e.g. 50000" disabled={ops} /></div>{form.projectCost && form.projectCostCurrency !== "USD" && <p className="text-[10px] text-gray-400 mt-1">≈ {fmtUSD(toUSD(form.projectCost, form.projectCostCurrency))} USD</p>}</div>
+              <div className="col-span-2"><FLabel>Project Timeline</FLabel><FInput value={form.projectTimeline} onChange={f("projectTimeline")} placeholder="e.g. 6 weeks" disabled={ops} /></div>
             </div> : <div className="grid grid-cols-2 gap-3">
               <div><FLabel>Est. Hours / Month</FLabel><FInput type="number" value={form.estimatedHours} onChange={f("estimatedHours")} placeholder="e.g. 80" disabled={ops} /></div>
-              <div><FLabel>Potential Monthly Revenue (\u20B9)</FLabel><FInput type="number" value={form.potentialMonthlyRevenue} onChange={f("potentialMonthlyRevenue")} placeholder="e.g. 120000" disabled={ops} /></div>
+              <div><FLabel>Monthly Revenue</FLabel><div className="flex gap-2"><FSel value={form.revenueCurrency} onChange={f("revenueCurrency")} options={CURRENCIES} disabled={ops} /><FInput type="number" value={form.potentialMonthlyRevenue} onChange={f("potentialMonthlyRevenue")} placeholder="e.g. 5000" disabled={ops} /></div>{form.potentialMonthlyRevenue && form.revenueCurrency !== "USD" && <p className="text-[10px] text-gray-400 mt-1">≈ {fmtUSD(toUSD(form.potentialMonthlyRevenue, form.revenueCurrency))} USD</p>}</div>
             </div>}
             <div className="mt-3"><FLabel>Client Timezone</FLabel><Tog options={TIMEZONES} value={form.clientTimezone} onChange={fv("clientTimezone")} disabled={ops} /></div>
             <div className="mt-3"><FLabel>Support Window</FLabel><FInput value={form.supportWindow} onChange={f("supportWindow")} placeholder="e.g. 9 AM \u2013 5 PM AEST, Mon\u2013Fri" disabled={ops} /></div>
@@ -429,6 +450,11 @@
       useEffect(() => { load(); }, [load]);
       useEffect(() => { const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
       const unread = notifs.filter(n => !(n.read_by || []).includes(userId)).length;
+      const markOneRead = async n => {
+        if ((n.read_by || []).includes(userId)) return;
+        const arr = [...(n.read_by || []), userId];
+        try { await dbN.read(n.id, arr); setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, read_by: arr } : x)); } catch { }
+      };
       const markAllRead = async () => {
         const unreadItems = notifs.filter(n => !(n.read_by || []).includes(userId));
         for (const n of unreadItems) { const arr = [...(n.read_by || []), userId]; await dbN.read(n.id, arr); }
@@ -437,22 +463,25 @@
       const icon = t => t === "opp_won" ? "&#127942;" : t === "opp_added" ? "&#10024;" : t === "hiring_forwarded" ? "&#127919;" : "&#128260;";
       return (
         <div ref={ref} className="relative">
-          <button onClick={() => { setOpen(o => { if (!o) markAllRead(); return !o; }) }} className="relative w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors text-lg">
+          <button onClick={() => setOpen(o => !o)} className="relative w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors text-lg">
             &#128276;
             {unread > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#FFDD2F] text-[#1B1B1B] text-[9px] font-extrabold rounded-full flex items-center justify-center">{unread > 9 ? "9+" : unread}</span>}
           </button>
           {open && (
             <div className="absolute right-0 top-10 w-80 bg-white rounded-2xl border border-gray-100 shadow-2xl overflow-hidden z-50">
               <div className="px-4 py-3 bg-[#1B1B1B] flex items-center justify-between">
-                <p className="text-xs font-bold text-white">Notifications</p>
-                <button onClick={load} className="text-xs text-gray-400 hover:text-[#FFDD2F] transition-colors">&#8635; Refresh</button>
+                <p className="text-xs font-bold text-white">Notifications {unread > 0 && <span className="text-[#FFDD2F]">({unread} new)</span>}</p>
+                <div className="flex items-center gap-3">
+                  {unread > 0 && <button onClick={markAllRead} className="text-xs text-gray-400 hover:text-[#FFDD2F] transition-colors">Mark all read</button>}
+                  <button onClick={load} className="text-xs text-gray-400 hover:text-[#FFDD2F] transition-colors">&#8635;</button>
+                </div>
               </div>
               {notifs.length === 0
                 ? <p className="text-xs text-gray-400 text-center py-8">No notifications yet</p>
                 : <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
                   {notifs.map(n => {
                     const read = (n.read_by || []).includes(userId); return (
-                      <div key={n.id} className={`px-4 py-3 ${read ? "" : "bg-[#FFFBEA]"}`}>
+                      <div key={n.id} onClick={() => markOneRead(n)} className={`px-4 py-3 transition-colors ${read ? "hover:bg-gray-50" : "bg-[#FFFBEA] hover:bg-yellow-100 cursor-pointer"}`}>
                         <div className="flex items-start gap-2">
                           <span className="text-base flex-shrink-0 mt-0.5" dangerouslySetInnerHTML={{ __html: icon(n.type) }} />
                           <div className="flex-1 min-w-0">
@@ -528,9 +557,9 @@
                   <div><FLabel>Experience Required</FLabel><FInput value={form.experience_required} onChange={f("experience_required")} placeholder="e.g. 3\u20135 years in CRM / email marketing" /></div>
                 </div>
               </FSec>
-              <FSec title="Hiring Budget (TA Reference Only)">
+              <FSec title="Hiring Budget (TA Reference Only — Internal)">
                 <div><FLabel>Budget (\u20B9 / month)</FLabel><FInput type="number" value={form.hiring_budget_inr} onChange={f("hiring_budget_inr")} placeholder="e.g. 80000" /></div>
-                <p className="text-[10px] text-gray-400 mt-1.5">Client&apos;s budget is not visible to TA. This is the internal hiring budget only.</p>
+                <p className="text-[10px] text-gray-400 mt-1.5">Internal hiring budget in INR. Client&apos;s commercial details are never shared with TA.</p>
               </FSec>
               <FSec title="Notes for TA">
                 <FTxt value={form.notes} onChange={f("notes")} placeholder="Specific instructions, preferred profiles, cultural fit requirements\u2026" rows={3} />
@@ -547,6 +576,42 @@
       );
     };
 
+    // ── Candidate finalise modal ──────────────────────────────────────────────
+    const CandidateModal = ({ item, onClose, onSaved }) => {
+      const [form, setForm] = useState({ candidate_name: item.candidate_name || "", candidate_profile_url: item.candidate_profile_url || "", candidate_notes: item.candidate_notes || "" });
+      const [busy, setBusy] = useState(false);
+      const [err, setErr] = useState("");
+      const f = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
+      const submit = async e => {
+        e.preventDefault();
+        if (!form.candidate_name) { setErr("Candidate name is required."); return; }
+        setBusy(true); setErr("");
+        try { await dbH.updCandidate(item.id, "Finalised", form); onSaved({ ...item, status: "Finalised", ...form }); onClose(); }
+        catch (er) { setErr(er.message || "Save failed."); setBusy(false); }
+      };
+      return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 bg-emerald-600">
+              <div><h2 className="text-sm font-bold text-white">&#127942; Mark as Finalised</h2><p className="text-xs text-emerald-100 mt-0.5">{item.role_title} &mdash; {item.opp_client_name}</p></div>
+              <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 text-xl leading-none">&times;</button>
+            </div>
+            <form onSubmit={submit} className="p-5 space-y-4">
+              <div><FLabel req>Selected Candidate Name</FLabel><FInput value={form.candidate_name} onChange={f("candidate_name")} placeholder="e.g. Priya Mehta" required /></div>
+              <div><FLabel>LinkedIn / Profile URL</FLabel><FInput value={form.candidate_profile_url} onChange={f("candidate_profile_url")} placeholder="https://linkedin.com/in/&#8230;" /></div>
+              <div><FLabel>Notes</FLabel><FTxt value={form.candidate_notes} onChange={f("candidate_notes")} placeholder="Offer details, joining date, special conditions&#8230;" rows={3} /></div>
+              {err && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</p>}
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={onClose} className="py-2.5 px-4 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                <div className="flex-1" />
+                <button type="submit" disabled={busy} className="py-2.5 px-5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2 transition-colors">{busy ? <><Spinner sz="w-4 h-4" c="border-white" />Saving&#8230;</> : "&#127942; Confirm Finalised"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    };
+
     // ── Hiring Roles page ─────────────────────────────────────────────────────
     const HiringRolesPage = ({ role }) => {
       const isTA = role === "ta";
@@ -556,31 +621,51 @@
       const [fSt, setFSt] = useState("");
       const [fUr, setFUr] = useState("");
       const [updId, setUpdId] = useState(null);
+      const [delId, setDelId] = useState(null);
+      const [candModal, setCandModal] = useState(null);
+      const isAdmin = role === "admin";
       useEffect(() => { dbH.load().then(d => { setItems(d); setLoad(false); }).catch(() => setLoad(false)); }, []);
+      const handleDel = async id => {
+        if (!confirm("Delete this hiring role? This cannot be undone.")) return;
+        setDelId(id);
+        try { await dbH.del(id); setItems(p => p.filter(x => x.id !== id)); } catch { }
+        setDelId(null);
+      };
       const filtered = useMemo(() => {
         let r = [...items];
-        if (search) { const q = search.toLowerCase(); r = r.filter(i => [i.role_title, i.opp_client_name, i.role_type, i.skills_required].some(v => (v || "").toLowerCase().includes(q))); }
+        if (search) { const q = search.toLowerCase(); r = r.filter(i => [i.role_title, i.opp_client_name, i.role_type, i.skills_required, i.candidate_name].some(v => (v || "").toLowerCase().includes(q))); }
         if (fSt) r = r.filter(i => i.status === fSt);
         if (fUr) r = r.filter(i => i.urgency === fUr);
         return r;
       }, [items, search, fSt, fUr]);
+
       const upd = async (id, status) => {
+        const item = items.find(x => x.id === id);
+        if (status === "Finalised") {
+          setCandModal(item);
+          return;
+        }
         setUpdId(id);
         try { await dbH.upd(id, { status }); setItems(p => p.map(x => x.id === id ? { ...x, status } : x)); } catch { }
         setUpdId(null);
       };
+
+      const onCandSaved = updated => {
+        setItems(p => p.map(x => x.id === updated.id ? updated : x));
+      };
+
       if (loading) return <div className="flex justify-center p-12"><Spinner /></div>;
       return (
         <div className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
             <StatCard label="Total Roles" value={items.length} />
             <StatCard label="Open" value={items.filter(i => i.status === "Open").length} hi />
-            <StatCard label="In Progress" value={items.filter(i => i.status === "In Progress").length} />
-            <StatCard label="Filled" value={items.filter(i => i.status === "Filled").length} />
+            <StatCard label="In Progress" value={items.filter(i => ["Sourcing", "Interviewing"].includes(i.status)).length} />
+            <StatCard label="Finalised" value={items.filter(i => i.status === "Finalised").length} />
           </div>
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 mb-4">
             <div className="flex flex-wrap gap-2 items-center">
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="&#128269;  Search role, client, skills&#8230;" className="flex-1 min-w-36 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="&#128269;  Search role, client, skills, candidate&#8230;" className="flex-1 min-w-36 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]" />
               <select value={fSt} onChange={e => setFSt(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"><option value="">All Status</option>{HIRE_STATUS.map(s => <option key={s} value={s}>{s}</option>)}</select>
               <select value={fUr} onChange={e => setFUr(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"><option value="">All Urgency</option>{URGENCY_OPTS.map(u => <option key={u} value={u}>{u}</option>)}</select>
               {(fSt || fUr || search) && <button onClick={() => { setSearch(""); setFSt(""); setFUr(""); }} className="px-3 py-2 text-xs font-semibold text-gray-400 hover:text-red-500 border border-gray-200 rounded-lg transition-colors">&#10005; Clear</button>}
@@ -593,7 +678,7 @@
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 text-xs text-gray-400 font-bold uppercase tracking-wide bg-gray-50/80">
-                      <th className="px-5 py-3 text-left">Role Title</th>
+                      <th className="px-5 py-3 text-left">Role / Candidate</th>
                       <th className="px-4 py-3 text-left">Client</th>
                       <th className="px-4 py-3 text-left">Type</th>
                       <th className="px-4 py-3 text-left">Urgency</th>
@@ -602,7 +687,8 @@
                       <th className="px-4 py-3 text-left">Status</th>
                       {!isTA && <th className="px-4 py-3 text-left hidden lg:table-cell">Forwarded By</th>}
                       <th className="px-4 py-3 text-left hidden xl:table-cell">Added</th>
-                      {isTA && <th className="px-4 py-3 w-36">Update Status</th>}
+                      {isTA && <th className="px-4 py-3 w-44">Update Stage</th>}
+                      {isAdmin && <th className="px-4 py-3 w-16" />}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -610,8 +696,17 @@
                       <tr key={item.id} className="hover:bg-[#FFFEF5] transition-colors">
                         <td className="px-5 py-3.5">
                           <p className="font-bold text-[#1B1B1B]">{item.role_title}</p>
-                          {item.skills_required && <p className="text-xs text-gray-400 mt-0.5 max-w-[200px] truncate">{item.skills_required}</p>}
+                          {item.skills_required && <p className="text-xs text-gray-400 mt-0.5 max-w-[220px] truncate" title={item.skills_required}>{item.skills_required}</p>}
                           {item.experience_required && <p className="text-xs text-blue-400 mt-0.5">{item.experience_required}</p>}
+                          {item.notes && <p className="text-xs text-gray-500 mt-1 max-w-[220px] truncate italic" title={item.notes}>Note: {item.notes}</p>}
+                          {item.status === "Finalised" && item.candidate_name && (
+                            <div className="mt-1.5 flex items-center gap-1.5 bg-emerald-50 rounded-lg px-2 py-1 border border-emerald-100">
+                              <span className="text-emerald-700 text-xs">&#127942;</span>
+                              {item.candidate_profile_url
+                                ? <a href={item.candidate_profile_url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-emerald-700 hover:underline" onClick={e => e.stopPropagation()}>{item.candidate_name}</a>
+                                : <span className="text-xs font-semibold text-emerald-700">{item.candidate_name}</span>}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3.5 font-semibold text-[#1B1B1B]">{item.opp_client_name || "\u2014"}</td>
                         <td className="px-4 py-3.5"><span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-semibold">{item.role_type || "Contractual"}</span></td>
@@ -628,6 +723,11 @@
                             </select>
                           </td>
                         )}
+                        {isAdmin && (
+                          <td className="px-4 py-3.5">
+                            <button onClick={() => handleDel(item.id)} disabled={delId === item.id} className="px-2 py-1 text-xs font-bold rounded-lg bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-40 transition-colors" title="Delete role">{delId === item.id ? "&#8230;" : "&#10005;"}</button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -638,6 +738,7 @@
               </div>
             }
           </div>
+          {candModal && <CandidateModal item={candModal} onClose={() => setCandModal(null)} onSaved={onCandSaved} />}
         </div>
       );
     };
@@ -752,6 +853,8 @@
       const [search, setSearch] = useState("");
       const [fStage, setFStage] = useState("");
       const [fSrc, setFSrc] = useState("");
+      const [fDateFrom, setFDateFrom] = useState("");
+      const [fDateTo, setFDateTo] = useState("");
       const [modal, setModal] = useState(null);
       const [nav, setNav] = useState(isTA ? "hiring" : "opps");
       const [sort, setSort] = useState({ field: "created_at", dir: "desc" });
@@ -777,11 +880,13 @@
         if (search) { const q = search.toLowerCase(); r = r.filter(o => [o.clientName, o.primaryPlatform, ...(o.platforms || []), o.opportunityOwner, o.source].some(v => (v || "").toLowerCase().includes(q))); }
         if (fStage) r = r.filter(o => o.stage === fStage);
         if (fSrc) r = r.filter(o => o.source === fSrc);
+        if (fDateFrom) r = r.filter(o => o.created_at && o.created_at.slice(0, 10) >= fDateFrom);
+        if (fDateTo) r = r.filter(o => o.created_at && o.created_at.slice(0, 10) <= fDateTo);
         r.sort((a, b) => { let va = a[sort.field] || "", vb = b[sort.field] || ""; if (sort.field === "potentialMonthlyRevenue") { va = Number(va) || 0; vb = Number(vb) || 0; } return sort.dir === "asc" ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1); });
         return r;
       }, [opps, search, fStage, fSrc, sort]);
 
-      const stats = useMemo(() => { const active = opps.filter(o => !["Won", "Lost", "On Hold"].includes(o.stage)); const won = opps.filter(o => o.stage === "Won"); return { total: opps.length, active: active.length, pipe: active.reduce((s, o) => s + (Number(o.potentialMonthlyRevenue) || 0), 0), won: won.reduce((s, o) => s + (Number(o.potentialMonthlyRevenue) || 0), 0) }; }, [opps]);
+      const stats = useMemo(() => { const active = opps.filter(o => !["Won", "Lost", "On Hold"].includes(o.stage)); const won = opps.filter(o => o.stage === "Won"); return { total: opps.length, active: active.length, pipe: active.reduce((s, o) => s + toUSD(o.potentialMonthlyRevenue || o.projectCost, o.revenueCurrency || o.projectCostCurrency || "USD"), 0), won: won.reduce((s, o) => s + toUSD(o.potentialMonthlyRevenue || o.projectCost, o.revenueCurrency || o.projectCostCurrency || "USD"), 0) }; }, [opps]);
 
       const togSort = f => setSort(s => s.field === f ? { ...s, dir: s.dir === "asc" ? "desc" : "asc" } : { field: f, dir: "asc" });
       const Arr = ({ f }) => sort.field === f ? <span className="ml-0.5 opacity-50">{sort.dir === "asc" ? "↑" : "↓"}</span> : null;
@@ -817,7 +922,44 @@
         } catch { dbO.load().then(d => setOpps(d)).catch(() => { }); }
       };
 
-      const filtPipe = filtered.reduce((s, o) => s + (Number(o.potentialMonthlyRevenue) || 0), 0);
+      const filtPipe = filtered.reduce((s, o) => s + toUSD(o.potentialMonthlyRevenue || o.projectCost, o.revenueCurrency || o.projectCostCurrency || "USD"), 0);
+
+      const exportPDF = () => {
+        const rows = filtered.map(o => [
+          o.clientName || "Unnamed",
+          (o.platforms && o.platforms.length ? o.platforms : (o.primaryPlatform ? [o.primaryPlatform] : [])).join(", ") || "\u2014",
+          o.engagementType || "\u2014",
+          o.stage || "New Lead",
+          o.source || "\u2014",
+          (o.potentialMonthlyRevenue || o.projectCost) ? `${fmtCurr(o.potentialMonthlyRevenue || o.projectCost, o.revenueCurrency || o.projectCostCurrency || "USD")}${(o.revenueCurrency || o.projectCostCurrency || "USD") !== "USD" ? ` (\u2248${fmtUSD(toUSD(o.potentialMonthlyRevenue || o.projectCost, o.revenueCurrency || o.projectCostCurrency || "USD"))} USD)` : ""}` : " \u2014",
+          o.opportunityOwner || "\u2014",
+          o.assignedToSales || "\u2014",
+          fmtDate(o.created_at),
+        ]);
+        const hdr = ["Client", "Platform(s)", "Type", "Stage", "Source", "Revenue", "Owner", "Sales", "Added"];
+        const html = `<!DOCTYPE html><html><head><title>Mavlers \u2014 Opportunity Export ${new Date().toLocaleDateString()}</title><style>
+*{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;box-sizing:border-box;}
+body{margin:0;padding:24px;background:#fff;color:#1B1B1B;}
+h2{margin:0 0 4px;font-size:20px;}p.sub{margin:0 0 16px;font-size:12px;color:#888;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead tr{background:#1B1B1B;}
+thead th{color:#FFDD2F;padding:8px 10px;text-align:left;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
+tbody tr:nth-child(even){background:#f8f8f8;}
+tbody td{padding:7px 10px;border-bottom:1px solid #eee;}
+tfoot td{padding:8px 10px;font-size:11px;color:#888;border-top:2px solid #1B1B1B;}
+@media print{@page{margin:16mm;}body{padding:0;}}
+</style></head><body>
+<h2>Mavlers \u2014 Opportunity Tracker</h2>
+<p class="sub">${filtered.length} opportunities \u00B7 Pipeline Value: ${fmtUSD(filtPipe)} USD \u00B7 Exported ${new Date().toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}</p>
+<table><thead><tr>${hdr.map(h => `<th>${h}</th>`).join("")}</tr></thead>
+<tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody>
+<tfoot><tr><td colspan="${hdr.length}">Mavlers Opportunity Tracker \u2014 Confidential</td></tr></tfoot>
+</table></body></html>`;
+        const w = window.open("", "_blank", "width=1100,height=750");
+        if (!w) { alert("Pop-up blocked. Please allow pop-ups for this site."); return; }
+        w.document.write(html); w.document.close();
+        setTimeout(() => w.print(), 400);
+      };
       const getPlatformDisplay = o => {
         const p = o.platforms && o.platforms.length ? o.platforms : (o.primaryPlatform ? [o.primaryPlatform] : []);
         if (!p.length) return "\u2014"; if (p.length === 1) return p[0]; return `${p[0]} +${p.length - 1}`;
@@ -860,16 +1002,19 @@
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
                   <StatCard label="Total Opps" value={stats.total} />
                   <StatCard label="Active Pipeline" value={stats.active} sub="excl. Won / Lost" />
-                  <StatCard label="Monthly Pipeline" value={fmtINR(stats.pipe)} hi sub="active opps" />
-                  <StatCard label="Monthly Won" value={fmtINR(stats.won)} sub="closed" />
+                  <StatCard label="Pipeline Value" value={fmtUSD(stats.pipe)} hi sub="active opps · USD" />
+                  <StatCard label="Monthly Won" value={fmtUSD(stats.won)} sub="closed · USD" />
                 </div>
                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 mb-4">
                   <div className="flex flex-wrap gap-2 items-center">
                     <input value={search} onChange={e => setSearch(e.target.value)} placeholder="&#128269;  Search client, platform, owner&#8230;" className="flex-1 min-w-36 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]" />
                     <select value={fStage} onChange={e => setFStage(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"><option value="">All Stages</option>{STAGES.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <select value={fSrc} onChange={e => setFSrc(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]"><option value="">All Sources</option>{SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    {(fStage || fSrc || search) && <button onClick={() => { setSearch(""); setFStage(""); setFSrc(""); }} className="px-3 py-2 text-xs font-semibold text-gray-400 hover:text-red-500 border border-gray-200 rounded-lg transition-colors">&#10005; Clear</button>}
+                    <input type="date" value={fDateFrom} onChange={e => setFDateFrom(e.target.value)} title="From date" className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]" />
+                    <input type="date" value={fDateTo} onChange={e => setFDateTo(e.target.value)} title="To date" className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]" />
+                    {(fStage || fSrc || search || fDateFrom || fDateTo) && <button onClick={() => { setSearch(""); setFStage(""); setFSrc(""); setFDateFrom(""); setFDateTo(""); }} className="px-3 py-2 text-xs font-semibold text-gray-400 hover:text-red-500 border border-gray-200 rounded-lg transition-colors">&#10005; Clear</button>}
                     <div className="flex-1" />
+                    {!isTA && <button onClick={exportPDF} className="flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-200 transition-colors whitespace-nowrap">&#128247; Export PDF</button>}
                     {can.create(role) && <button onClick={() => setModal({ mode: "add" })} className="flex items-center gap-1.5 px-4 py-2 bg-[#FFDD2F] text-[#1B1B1B] rounded-lg text-sm font-bold hover:bg-[#f5d000] transition-colors whitespace-nowrap shadow-sm">+ Add Opportunity</button>}
                   </div>
                 </div>
@@ -896,7 +1041,12 @@
                             <tbody className="divide-y divide-gray-50">
                               {filtered.map(o => (
                                 <tr key={o.id} onClick={() => setViewOpp(o)} className="hover:bg-[#FFFEF5] transition-colors group cursor-pointer">
-                                  <td className="px-5 py-3.5"><p className="font-bold text-[#1B1B1B] truncate max-w-[180px]">{o.clientName || <span className="text-gray-300 italic font-normal">Unnamed</span>}</p>{o.industry && <p className="text-xs text-gray-400">{o.industry}{o.clientSize ? ` \u00B7 ${o.clientSize}` : ""}</p>}</td>
+                                  <td className="px-5 py-3.5">
+                                    <div className="flex items-center gap-2">
+                                      <div className="min-w-0"><p className="font-bold text-[#1B1B1B] truncate max-w-[160px]">{o.clientName || <span className="text-gray-300 italic font-normal">Unnamed</span>}</p>{o.industry && <p className="text-xs text-gray-400">{o.industry}{o.clientSize ? ` \u00B7 ${o.clientSize}` : ""}</p>}</div>
+                                      <span className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 flex-shrink-0 text-sm" title="Click to view details">&#128065;</span>
+                                    </div>
+                                  </td>
                                   <td className="px-4 py-3.5 text-gray-600 truncate max-w-[140px]">{getPlatformDisplay(o)}</td>
                                   <td className="px-4 py-3.5 relative" onClick={e => e.stopPropagation()}>
                                     {stageBusy === o.id
@@ -909,7 +1059,11 @@
                                       </div>
                                     }
                                   </td>
-                                  <td className="px-4 py-3.5"><span className={`font-bold ${o.potentialMonthlyRevenue ? "text-[#1B1B1B]" : "text-gray-300"}`}>{o.potentialMonthlyRevenue ? fmtINR(Number(o.potentialMonthlyRevenue)) : "\u2014"}</span></td>
+                                  <td className="px-4 py-3.5">
+                                    {(o.potentialMonthlyRevenue || o.projectCost)
+                                      ? <div><span className="font-bold text-[#1B1B1B]">{fmtCurr(o.potentialMonthlyRevenue || o.projectCost, o.revenueCurrency || o.projectCostCurrency || "USD")}</span>{(o.revenueCurrency || o.projectCostCurrency || "USD") !== "USD" && <span className="text-[10px] text-gray-400 block">{fmtUSD(toUSD(o.potentialMonthlyRevenue || o.projectCost, o.revenueCurrency || o.projectCostCurrency || "USD"))} USD</span>}</div>
+                                      : <span className="text-gray-300">&mdash;</span>}
+                                  </td>
                                   <td className="px-4 py-3.5 text-gray-500 hidden md:table-cell">{o.source || "\u2014"}</td>
                                   <td className="px-4 py-3.5 text-gray-500 text-xs hidden lg:table-cell truncate max-w-[120px]">{o.opportunityOwner || "\u2014"}</td>
                                   <td className="px-4 py-3.5 text-gray-400 text-xs hidden xl:table-cell whitespace-nowrap">{fmtDate(o.created_at)}</td>
@@ -927,14 +1081,14 @@
                         </div>
                         <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between flex-wrap gap-2">
                           <p className="text-xs text-gray-400 font-medium">Showing <strong className="text-[#1B1B1B]">{filtered.length}</strong> of <strong className="text-[#1B1B1B]">{opps.length}</strong> opportunities</p>
-                          <p className="text-xs text-gray-400 font-medium">Filtered pipeline: <strong className="text-[#1B1B1B]">{fmtINR(filtPipe)}</strong></p>
+                          <p className="text-xs text-gray-400 font-medium">Filtered pipeline: <strong className="text-[#1B1B1B]">{fmtUSD(filtPipe)}</strong> USD</p>
                         </div>
                       </>)
                   }
                 </div>
               </div>
             )}
-          {modal && <OppModal editData={modal.mode === "edit" ? modal.data : null} userId={uid} role={role} onClose={() => { setModal(null); dbO.load().then(d => setOpps(d)).catch(() => { }); }} onSaved={onSaved} />}
+          {modal && <OppModal editData={modal.mode === "edit" ? modal.data : null} userId={uid} role={role} updatedBy={uname} onClose={() => { setModal(null); dbO.load().then(d => setOpps(d)).catch(() => { }); }} onSaved={onSaved} />}
           {fwdModal && <ForwardToTAModal opp={fwdModal} userEmail={uemail} userName={uname} onClose={() => setFwdModal(null)} onForwarded={() => { }} />}
           {viewOpp && <ViewPanel opp={viewOpp} onClose={() => setViewOpp(null)} role={role} uid={uid} onEdit={() => { setModal({ mode: "edit", data: viewOpp }); setViewOpp(null); }} />}
         </div>
@@ -949,25 +1103,37 @@
           <p className="text-sm text-[#1B1B1B] font-medium leading-snug">{value}</p>
         </div>
       ) : null;
+      const Block = ({ label, value }) => value ? (
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded-xl p-4">{value}</p>
+        </div>
+      ) : null;
 
       const platforms = opp.platforms && opp.platforms.length ? opp.platforms : (opp.primaryPlatform ? [opp.primaryPlatform] : []);
       const sm = STAGE_META[opp.stage || "New Lead"] || STAGE_META["New Lead"];
+      const isP2P = opp.engagementType === "Project-to-Project";
+      const revAmt = opp.potentialMonthlyRevenue;
+      const projAmt = opp.projectCost;
+      const revCur = opp.revenueCurrency || "USD";
+      const projCur = opp.projectCostCurrency || "USD";
+      const expertise = Array.isArray(opp.expertiseNeeded) ? opp.expertiseNeeded.join(", ") : (opp.expertiseNeeded || "");
 
       return (
         <div className="fixed inset-0 z-[55] flex justify-end" onClick={onClose}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div className="relative w-full max-w-md bg-white h-full flex flex-col shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}>
+
             {/* Header */}
             <div className="flex items-start justify-between px-5 py-4 bg-[#1B1B1B]">
               <div className="min-w-0">
                 <h2 className="text-base font-bold text-white truncate">{opp.clientName || "Unnamed"}</h2>
-                {opp.industry && <p className="text-xs text-gray-400 mt-0.5">{opp.industry}</p>}
+                {opp.industry && <p className="text-xs text-gray-400 mt-0.5">{opp.industry}{opp.clientSize ? ` · ${opp.clientSize}` : ""}</p>}
+                {opp.website && <a href={opp.website} target="_blank" rel="noreferrer" className="text-xs text-[#FFDD2F] hover:underline mt-0.5 block truncate">{opp.website}</a>}
               </div>
               <div className="flex items-center gap-2 ml-3 flex-shrink-0">
-                <span className={`text-xs font-bold px-2 py-1 rounded-full border ${sm.bg} ${sm.text} ${sm.border}`}>
-                  {opp.stage || "New Lead"}
-                </span>
+                <span className={`text-xs font-bold px-2 py-1 rounded-full border ${sm.bg} ${sm.text} ${sm.border}`}>{opp.stage || "New Lead"}</span>
                 <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 text-lg leading-none transition-colors">&times;</button>
               </div>
             </div>
@@ -980,63 +1146,79 @@
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Platform(s)</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {platforms.map(p => (
-                      <span key={p} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full font-semibold">{p}</span>
-                    ))}
+                    {platforms.map(p => <span key={p} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full font-semibold">{p}</span>)}
                   </div>
                 </div>
               )}
 
-              {/* Key details */}
+              {/* Ownership & commercial */}
               <div className="bg-gray-50 rounded-xl p-4 space-y-0">
                 <Row label="Opportunity Owner" value={opp.opportunityOwner} />
+                <Row label="Assigned Sales" value={opp.assignedToSales} />
                 <Row label="Source" value={opp.source} />
                 <Row label="Engagement Type" value={opp.engagementType} />
-                <Row label="Billing Model" value={opp.billingModel} />
-                <Row label="Estimated Hours" value={opp.estimatedHours ? `${opp.estimatedHours} hrs` : null} />
-                <Row label="Potential Monthly Revenue" value={opp.potentialMonthlyRevenue ? fmtINR(Number(opp.potentialMonthlyRevenue)) : null} />
-              </div>
-
-              {/* Scope / Notes */}
-              {opp.notes && (
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Notes / Scope</p>
-                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded-xl p-4">{opp.notes}</p>
-                </div>
-              )}
-
-              {/* Problem statement */}
-              {opp.problemStatement && (
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Problem Statement</p>
-                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded-xl p-4">{opp.problemStatement}</p>
-                </div>
-              )}
-
-              {/* Secondary details */}
-              <div className="bg-gray-50 rounded-xl p-4 space-y-0">
-                <Row label="Client Size" value={opp.clientSize} />
-                <Row label="POC" value={opp.poc} />
-                <Row label="POC Email" value={opp.pocEmail} />
-                <Row label="Expertise Needed" value={Array.isArray(opp.expertise) ? opp.expertise.join(", ") : opp.expertise} />
-                <Row label="Copywriting" value={opp.copywriting} />
-                <Row label="Email Production" value={opp.emailProduction} />
-                <Row label="Timezone" value={opp.timezone} />
+                <Row label="Client Timezone" value={opp.clientTimezone} />
                 <Row label="Support Window" value={opp.supportWindow} />
+                {!isP2P && <Row label="Est. Hours / Month" value={opp.estimatedHours ? `${opp.estimatedHours} hrs` : null} />}
+                {!isP2P && revAmt && <Row label="Monthly Revenue" value={`${fmtCurr(revAmt, revCur)}${revCur !== "USD" ? ` (≈ ${fmtUSD(toUSD(revAmt, revCur))} USD)` : ""}`} />}
+                {isP2P && projAmt && <Row label="Project Cost" value={`${fmtCurr(projAmt, projCur)}${projCur !== "USD" ? ` (≈ ${fmtUSD(toUSD(projAmt, projCur))} USD)` : ""}`} />}
+                {isP2P && <Row label="Project Timeline" value={opp.projectTimeline} />}
+                <Row label="Budget Range" value={opp.budgetRange} />
               </div>
 
-              {/* Timestamps */}
-              <div className="text-xs text-gray-400 space-y-0.5 pt-1">
+              {/* POC */}
+              {(opp.pocName || opp.pocEmail) && (
+                <div className="bg-gray-50 rounded-xl p-4 space-y-0">
+                  <Row label="POC Name" value={opp.pocName} />
+                  <Row label="POC Title" value={opp.pocTitle} />
+                  <Row label="POC Email" value={opp.pocEmail} />
+                  <Row label="POC Phone" value={opp.pocPhone} />
+                </div>
+              )}
+
+              {/* Expertise */}
+              {expertise && (
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Expertise Needed</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(Array.isArray(opp.expertiseNeeded) ? opp.expertiseNeeded : [opp.expertiseNeeded]).filter(Boolean).map(e => <span key={e} className="text-xs bg-yellow-50 text-yellow-800 border border-yellow-200 px-2.5 py-1 rounded-full font-semibold">{e}</span>)}
+                  </div>
+                  {opp.expertiseOther && <p className="text-xs text-gray-500 mt-1.5">+ {opp.expertiseOther}</p>}
+                  {opp.copywritingRequirement && <p className="text-xs text-gray-600 mt-1.5">Copywriting: <strong>{opp.copywritingRequirement}</strong></p>}
+                  {opp.emailProductionRequirement && <p className="text-xs text-gray-600 mt-0.5">Email Production: <strong>{opp.emailProductionRequirement}</strong></p>}
+                </div>
+              )}
+
+              {/* Narrative fields */}
+              <Block label="Problem Statement" value={opp.problemStatement} />
+              <Block label="Success Definition" value={opp.successDefinition} />
+              <Block label="Scope of Work" value={opp.scopeOfWork} />
+
+              {/* Call recordings */}
+              {(opp.discoveryCallUrl || opp.onboardingCallUrl) && (
+                <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Call Recordings</p>
+                  {opp.discoveryCallUrl && <a href={opp.discoveryCallUrl} target="_blank" rel="noreferrer" className="block text-xs text-blue-600 hover:underline truncate">&#128249; Discovery Call</a>}
+                  {opp.onboardingCallUrl && <a href={opp.onboardingCallUrl} target="_blank" rel="noreferrer" className="block text-xs text-blue-600 hover:underline truncate">&#128249; Onboarding Call</a>}
+                </div>
+              )}
+
+              {/* Notes */}
+              <Block label="Sales Notes" value={opp.salesNotes} />
+              <Block label="Ops Debrief Notes" value={opp.debriefNotes} />
+              <Block label="Additional Notes" value={opp.additionalNotes} />
+
+              {/* Timestamp */}
+              <div className="text-xs text-gray-400 pt-1 space-y-0.5">
                 {opp.created_at && <p>Added: {fmtDate(opp.created_at)}</p>}
+                {opp.updated_at && <p>Last updated: {fmtDate(opp.updated_at)}{opp.updated_by ? ` \u00B7 by ${opp.updated_by}` : ""}</p>}
               </div>
             </div>
 
             {/* Footer */}
             {can.edit(role, opp, uid) && (
               <div className="px-5 py-4 border-t border-gray-100 bg-gray-50">
-                <button onClick={onEdit} className="w-full py-2.5 bg-[#FFDD2F] text-[#1B1B1B] rounded-xl text-sm font-bold hover:bg-[#f5d000] transition-colors">
-                  Edit Opportunity
-                </button>
+                <button onClick={onEdit} className="w-full py-2.5 bg-[#FFDD2F] text-[#1B1B1B] rounded-xl text-sm font-bold hover:bg-[#f5d000] transition-colors">Edit Opportunity</button>
               </div>
             )}
           </div>
