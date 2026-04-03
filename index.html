@@ -11,6 +11,8 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <style>
     * {
       font-family: 'Montserrat', sans-serif;
@@ -55,6 +57,11 @@
 
     const SUPA_URL = "https://cwqsrkdqzmdtwhiyshre.supabase.co";
     const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3cXNya2Rxem1kdHdoaXlzaHJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MzE5NTcsImV4cCI6MjA5MDAwNzk1N30.OtoggcPrwOS8dDvWMm4p3wDD10ecHoZ3N2swRIPH0Zc";
+    const EXTRACT_FN_URL = `${SUPA_URL}/functions/v1/extract-opportunity`;
+    // Initialise pdf.js worker
+    if (window.pdfjsLib) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
     const db = supabase.createClient(SUPA_URL, SUPA_KEY, {
       auth: { flowType: 'implicit' }
     });
@@ -294,10 +301,14 @@
     });
 
     // ── Opportunity modal ─────────────────────────────────────────────────────
-    const OppModal = ({ editData, userId, role, updatedBy, onClose, onSaved }) => {
+    const OppModal = ({ editData, prefillData, userId, role, updatedBy, onClose, onSaved }) => {
       const ops = role === "ops";
       const isEdit = !!editData;
-      const init = isEdit ? { ...blankForm(), ...editData, platforms: editData.platforms || (editData.primaryPlatform ? [editData.primaryPlatform] : []), expertiseOther: editData.expertiseOther || "" } : blankForm();
+      const init = isEdit
+        ? { ...blankForm(), ...editData, platforms: editData.platforms || (editData.primaryPlatform ? [editData.primaryPlatform] : []), expertiseOther: editData.expertiseOther || "" }
+        : prefillData
+          ? { ...blankForm(), ...prefillData, platforms: prefillData.platforms || [], expertiseNeeded: prefillData.expertiseNeeded || [], expertiseOther: prefillData.expertiseOther || "" }
+          : blankForm();
       const [form, setForm] = useState(init);
       const [tab, setTab] = useState(ops ? 5 : 0);
       const [busy, setBusy] = useState(false);
@@ -612,6 +623,225 @@
       );
     };
 
+    // ── Upload & Extract Opportunity Modal ───────────────────────────────────
+    const UPLOAD_FIELD_GROUPS = [
+      {
+        title: "Client Info", fields: [
+          { key: "clientName", label: "Client / Company Name" },
+          { key: "industry", label: "Industry / Domain" },
+          { key: "clientSize", label: "Company Size" },
+          { key: "website", label: "Website" },
+          { key: "source", label: "Source" },
+        ]
+      },
+      {
+        title: "Point of Contact", fields: [
+          { key: "pocName", label: "POC Name" },
+          { key: "pocTitle", label: "POC Title" },
+          { key: "pocEmail", label: "POC Email" },
+          { key: "pocPhone", label: "POC Phone" },
+        ]
+      },
+      {
+        title: "Engagement", fields: [
+          { key: "engagementType", label: "Engagement Type" },
+          { key: "platforms", label: "Platform(s)", isArray: true },
+          { key: "expertiseNeeded", label: "Expertise Needed", isArray: true },
+          { key: "clientTimezone", label: "Client Timezone" },
+        ]
+      },
+      {
+        title: "Commercial", fields: [
+          { key: "budgetRange", label: "Budget Range" },
+          { key: "potentialMonthlyRevenue", label: "Monthly Revenue" },
+          { key: "revenueCurrency", label: "Revenue Currency" },
+          { key: "projectCost", label: "Project Cost" },
+          { key: "projectCostCurrency", label: "Project Cost Currency" },
+          { key: "projectTimeline", label: "Project Timeline" },
+        ]
+      },
+      {
+        title: "Notes & Context", fields: [
+          { key: "problemStatement", label: "Problem Statement" },
+          { key: "successDefinition", label: "Success Definition" },
+          { key: "scopeOfWork", label: "Scope of Work" },
+          { key: "salesNotes", label: "Sales Notes" },
+        ]
+      },
+    ];
+
+    const UploadModal = ({ onClose, onApply }) => {
+      const [step, setStep] = useState("upload"); // upload | extracting | review
+      const [file, setFile] = useState(null);
+      const [fields, setFields] = useState({});
+      const [selected, setSelected] = useState({});
+      const [error, setError] = useState("");
+      const [dragOver, setDragOver] = useState(false);
+      const fileRef = useRef(null);
+
+      const extractText = async f => {
+        const ext = f.name.split(".").pop().toLowerCase();
+        if (ext === "pdf") {
+          if (!window.pdfjsLib) throw new Error("PDF library not loaded yet \u2014 please refresh and try again.");
+          const buf = await f.arrayBuffer();
+          const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+          const limit = Math.min(pdf.numPages, 15);
+          let txt = "";
+          for (let i = 1; i <= limit; i++) {
+            const pg = await pdf.getPage(i);
+            const ct = await pg.getTextContent();
+            txt += ct.items.map(x => x.str).join(" ") + "\n";
+          }
+          return txt;
+        } else if (ext === "docx" || ext === "doc") {
+          if (!window.mammoth) throw new Error("DOCX library not loaded yet \u2014 please refresh and try again.");
+          const buf = await f.arrayBuffer();
+          const res = await window.mammoth.extractRawText({ arrayBuffer: buf });
+          return res.value;
+        } else if (ext === "txt") {
+          return await f.text();
+        } else {
+          throw new Error(`Unsupported file type (.${ext}). Please use PDF, DOCX, or TXT.`);
+        }
+      };
+
+      const processFile = async f => {
+        setFile(f); setError(""); setStep("extracting");
+        try {
+          const text = await extractText(f);
+          if (!text || text.trim().length < 30) throw new Error("Could not extract readable text from this file.");
+          const res = await fetch(EXTRACT_FN_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "apikey": SUPA_KEY },
+            body: JSON.stringify({ text }),
+          });
+          const json = await res.json();
+          if (!res.ok || json.error) throw new Error(json.error || "Extraction failed.");
+          const nonNull = Object.fromEntries(Object.entries(json.fields).filter(([, v]) => v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0)));
+          setFields(nonNull);
+          setSelected(Object.fromEntries(Object.keys(nonNull).map(k => [k, true])));
+          setStep("review");
+        } catch (er) {
+          setError(er.message); setStep("upload");
+        }
+      };
+
+      const handleDrop = e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) processFile(f); };
+      const handleFile = e => { const f = e.target.files[0]; if (f) processFile(f); };
+
+      const foundCount = Object.keys(fields).length;
+      const selectedCount = Object.values(selected).filter(Boolean).length;
+
+      const applyFields = () => {
+        const out = {};
+        for (const [k, v] of Object.entries(fields)) { if (selected[k]) out[k] = v; }
+        onApply(out); onClose();
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 bg-[#1B1B1B]">
+              <div>
+                <h2 className="text-sm font-bold text-white">&#128196; Upload Opportunity</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {step === "review" ? `${foundCount} fields extracted \u00B7 ${selectedCount} selected` : "Upload a brief, proposal, or RFP"}
+                </p>
+              </div>
+              <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+
+            {/* Step 1 — File pick */}
+            {step === "upload" && (
+              <div className="p-6 space-y-4">
+                <div
+                  onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileRef.current?.click()}
+                  className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all select-none ${dragOver ? "border-[#FFDD2F] bg-[#FFFBEA]" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"}`}
+                >
+                  <div className="text-5xl mb-3">&#128196;</div>
+                  <p className="font-bold text-[#1B1B1B] text-sm">Drop your document here</p>
+                  <p className="text-xs text-gray-400 mt-1">or click to browse</p>
+                  <p className="text-[10px] text-gray-300 mt-3 uppercase tracking-widest">PDF &nbsp;&middot;&nbsp; DOCX &nbsp;&middot;&nbsp; TXT</p>
+                  <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.txt" onChange={handleFile} className="hidden" />
+                </div>
+                {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 border border-red-100">{error}</p>}
+                <p className="text-[10px] text-gray-400 text-center">&#128274;&nbsp; The document is read locally &mdash; nothing is stored. Only extracted text is sent for AI analysis.</p>
+              </div>
+            )}
+
+            {/* Step 2 — Extracting */}
+            {step === "extracting" && (
+              <div className="flex flex-col items-center justify-center p-16 gap-4">
+                <Spinner sz="w-8 h-8" />
+                <div className="text-center">
+                  <p className="font-bold text-[#1B1B1B] text-sm">Analysing document&#8230;</p>
+                  <p className="text-xs text-gray-400 mt-1 truncate max-w-xs">{file?.name}</p>
+                  <p className="text-[10px] text-gray-300 mt-2">Extracting fields with AI &mdash; this takes 5&ndash;10 seconds</p>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3 — Review */}
+            {step === "review" && (
+              <>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
+                    <span className="text-blue-500 text-base">&#9432;</span>
+                    <p className="text-xs text-blue-700">Review extracted values. Uncheck anything you don&apos;t want applied. Editable text fields can be corrected inline.</p>
+                  </div>
+                  {UPLOAD_FIELD_GROUPS.map(group => {
+                    const gf = group.fields.filter(f => fields[f.key] !== undefined && fields[f.key] !== null);
+                    if (!gf.length) return null;
+                    return (
+                      <FSec key={group.title} title={group.title}>
+                        <div className="space-y-3">
+                          {gf.map(({ key, label, isArray }) => (
+                            <div key={key} className="flex items-start gap-2.5">
+                              <input type="checkbox" checked={!!selected[key]} onChange={e => setSelected(p => ({ ...p, [key]: e.target.checked }))}
+                                className="mt-2 w-3.5 h-3.5 flex-shrink-0 accent-[#FFDD2F]" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
+                                {isArray
+                                  ? <div className="flex flex-wrap gap-1">{(fields[key] || []).map(v => <span key={v} className="text-xs bg-yellow-50 text-yellow-800 border border-yellow-200 px-2 py-0.5 rounded-full font-semibold">{v}</span>)}</div>
+                                  : <input type="text" value={String(fields[key] || "")} onChange={e => setFields(p => ({ ...p, [key]: e.target.value }))}
+                                    className={`w-full text-xs px-2.5 py-1.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFDD2F] transition-colors ${selected[key] ? "border-gray-200 text-[#1B1B1B]" : "border-gray-100 text-gray-400"}`} />
+                                }
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </FSec>
+                    );
+                  })}
+                  {foundCount === 0 && (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500 font-semibold text-sm">No fields could be extracted</p>
+                      <p className="text-gray-400 text-xs mt-1">The document may be image-based or have no readable text.</p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50">
+                  <button onClick={() => { setStep("upload"); setFields({}); setSelected({}); setError(""); }}
+                    className="py-2.5 px-4 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-white transition-colors">
+                    &#8592; Re-upload
+                  </button>
+                  <div className="flex-1" />
+                  <button onClick={applyFields} disabled={selectedCount === 0}
+                    className="py-2.5 px-5 bg-[#FFDD2F] text-[#1B1B1B] rounded-xl text-sm font-bold hover:bg-[#f5d000] disabled:opacity-40 transition-colors">
+                    Fill Form ({selectedCount} fields) &#8594;
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      );
+    };
+
     // ── Hiring Roles page ─────────────────────────────────────────────────────
     const HiringRolesPage = ({ role }) => {
       const isTA = role === "ta";
@@ -864,6 +1094,12 @@
       const [fwdModal, setFwdModal] = useState(null);
       const [webhookUrl, setWHUrl] = useState("");
       const [viewOpp, setViewOpp] = useState(null);
+      const [uploadModal, setUploadModal] = useState(false);
+
+      const handleUploadApply = prefill => {
+        setUploadModal(false);
+        setModal({ mode: "prefill", data: prefill });
+      };
 
       useEffect(() => {
         dbO.load().then(d => { setOpps(d); setLoad(false); }).catch(() => setLoad(false));
@@ -924,42 +1160,6 @@
 
       const filtPipe = filtered.reduce((s, o) => s + toUSD(o.potentialMonthlyRevenue || o.projectCost, o.revenueCurrency || o.projectCostCurrency || "USD"), 0);
 
-      const exportPDF = () => {
-        const rows = filtered.map(o => [
-          o.clientName || "Unnamed",
-          (o.platforms && o.platforms.length ? o.platforms : (o.primaryPlatform ? [o.primaryPlatform] : [])).join(", ") || "\u2014",
-          o.engagementType || "\u2014",
-          o.stage || "New Lead",
-          o.source || "\u2014",
-          (o.potentialMonthlyRevenue || o.projectCost) ? `${fmtCurr(o.potentialMonthlyRevenue || o.projectCost, o.revenueCurrency || o.projectCostCurrency || "USD")}${(o.revenueCurrency || o.projectCostCurrency || "USD") !== "USD" ? ` (\u2248${fmtUSD(toUSD(o.potentialMonthlyRevenue || o.projectCost, o.revenueCurrency || o.projectCostCurrency || "USD"))} USD)` : ""}` : " \u2014",
-          o.opportunityOwner || "\u2014",
-          o.assignedToSales || "\u2014",
-          fmtDate(o.created_at),
-        ]);
-        const hdr = ["Client", "Platform(s)", "Type", "Stage", "Source", "Revenue", "Owner", "Sales", "Added"];
-        const html = `<!DOCTYPE html><html><head><title>Mavlers \u2014 Opportunity Export ${new Date().toLocaleDateString()}</title><style>
-*{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;box-sizing:border-box;}
-body{margin:0;padding:24px;background:#fff;color:#1B1B1B;}
-h2{margin:0 0 4px;font-size:20px;}p.sub{margin:0 0 16px;font-size:12px;color:#888;}
-table{width:100%;border-collapse:collapse;font-size:12px;}
-thead tr{background:#1B1B1B;}
-thead th{color:#FFDD2F;padding:8px 10px;text-align:left;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
-tbody tr:nth-child(even){background:#f8f8f8;}
-tbody td{padding:7px 10px;border-bottom:1px solid #eee;}
-tfoot td{padding:8px 10px;font-size:11px;color:#888;border-top:2px solid #1B1B1B;}
-@media print{@page{margin:16mm;}body{padding:0;}}
-</style></head><body>
-<h2>Mavlers \u2014 Opportunity Tracker</h2>
-<p class="sub">${filtered.length} opportunities \u00B7 Pipeline Value: ${fmtUSD(filtPipe)} USD \u00B7 Exported ${new Date().toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}</p>
-<table><thead><tr>${hdr.map(h => `<th>${h}</th>`).join("")}</tr></thead>
-<tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody>
-<tfoot><tr><td colspan="${hdr.length}">Mavlers Opportunity Tracker \u2014 Confidential</td></tr></tfoot>
-</table></body></html>`;
-        const w = window.open("", "_blank", "width=1100,height=750");
-        if (!w) { alert("Pop-up blocked. Please allow pop-ups for this site."); return; }
-        w.document.write(html); w.document.close();
-        setTimeout(() => w.print(), 400);
-      };
       const getPlatformDisplay = o => {
         const p = o.platforms && o.platforms.length ? o.platforms : (o.primaryPlatform ? [o.primaryPlatform] : []);
         if (!p.length) return "\u2014"; if (p.length === 1) return p[0]; return `${p[0]} +${p.length - 1}`;
@@ -1014,7 +1214,7 @@ tfoot td{padding:8px 10px;font-size:11px;color:#888;border-top:2px solid #1B1B1B
                     <input type="date" value={fDateTo} onChange={e => setFDateTo(e.target.value)} title="To date" className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFDD2F]" />
                     {(fStage || fSrc || search || fDateFrom || fDateTo) && <button onClick={() => { setSearch(""); setFStage(""); setFSrc(""); setFDateFrom(""); setFDateTo(""); }} className="px-3 py-2 text-xs font-semibold text-gray-400 hover:text-red-500 border border-gray-200 rounded-lg transition-colors">&#10005; Clear</button>}
                     <div className="flex-1" />
-                    {!isTA && <button onClick={exportPDF} className="flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-200 transition-colors whitespace-nowrap">&#128247; Export PDF</button>}
+                    {can.create(role) && <button onClick={() => setUploadModal(true)} className="flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-200 transition-colors whitespace-nowrap">&#128196; Upload Opportunity</button>}
                     {can.create(role) && <button onClick={() => setModal({ mode: "add" })} className="flex items-center gap-1.5 px-4 py-2 bg-[#FFDD2F] text-[#1B1B1B] rounded-lg text-sm font-bold hover:bg-[#f5d000] transition-colors whitespace-nowrap shadow-sm">+ Add Opportunity</button>}
                   </div>
                 </div>
@@ -1088,7 +1288,8 @@ tfoot td{padding:8px 10px;font-size:11px;color:#888;border-top:2px solid #1B1B1B
                 </div>
               </div>
             )}
-          {modal && <OppModal editData={modal.mode === "edit" ? modal.data : null} userId={uid} role={role} updatedBy={uname} onClose={() => { setModal(null); dbO.load().then(d => setOpps(d)).catch(() => { }); }} onSaved={onSaved} />}
+          {modal && <OppModal editData={modal.mode === "edit" ? modal.data : null} prefillData={modal.mode === "prefill" ? modal.data : null} userId={uid} role={role} updatedBy={uname} onClose={() => { setModal(null); dbO.load().then(d => setOpps(d)).catch(() => { }); }} onSaved={onSaved} />}
+          {uploadModal && <UploadModal onClose={() => setUploadModal(false)} onApply={handleUploadApply} />}
           {fwdModal && <ForwardToTAModal opp={fwdModal} userEmail={uemail} userName={uname} onClose={() => setFwdModal(null)} onForwarded={() => { }} />}
           {viewOpp && <ViewPanel opp={viewOpp} onClose={() => setViewOpp(null)} role={role} uid={uid} onEdit={() => { setModal({ mode: "edit", data: viewOpp }); setViewOpp(null); }} />}
         </div>
